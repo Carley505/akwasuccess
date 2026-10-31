@@ -1,0 +1,29 @@
+# deps
+node_modules/
+
+# next
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# local data (PGlite database, dev email outbox, uploaded files)
+.data/
+storage/private/
+storage/uploads/
+
+# tests
+playwright-report/
+test-results/
+coverage/
+.lighthouseci/
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
