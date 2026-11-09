@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,6 +20,18 @@ import { getArticleBySlug } from "@/lib/db/queries";
 import { absoluteUrl, formatDate, readingTime } from "@/lib/utils";
 
 type Params = Promise<{ slug: string }>;
+
+export function generateStaticParams() {
+  try {
+    const dir = path.join(process.cwd(), "content", "articles");
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => ({ slug: f.replace(/\.md$/, "") }));
+  } catch {
+    return [];
+  }
+}
 
 function extractHeadings(markdown: string): { id: string; text: string }[] {
   const slugger = new GithubSlugger();

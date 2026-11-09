@@ -39,7 +39,7 @@ export function BookingForm() {
           tone: "success",
           message:
             data.message ??
-            "Booking request received! We will confirm your time slot by email and WhatsApp.",
+            "Booking request received! We will confirm your time slot by email.",
         });
       }
     } catch {
@@ -55,7 +55,7 @@ export function BookingForm() {
       <h3 className="text-xl font-bold">Request a session slot</h3>
       <p className="text-muted text-sm">
         Choose a package below and tell us what you would like to cover. We will reply within one
-        working day to confirm your slot and M-Pesa/card payment details.
+        working day to confirm your slot and USD card payment details.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -75,14 +75,14 @@ export function BookingForm() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="book-phone" label="Phone / WhatsApp number">
+        <Field id="book-phone" label="Phone number">
           <Input
             id="book-phone"
             name="phone"
             type="tel"
-            inputMode="numeric"
+            inputMode="tel"
             autoComplete="tel"
-            placeholder="0712 345 678"
+            placeholder="+1 555 234 5678"
             required
           />
         </Field>

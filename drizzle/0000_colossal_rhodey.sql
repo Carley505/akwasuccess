@@ -1,8 +1,8 @@
 CREATE TYPE "public"."coupon_type" AS ENUM('percent', 'fixed');--> statement-breakpoint
 CREATE TYPE "public"."level" AS ENUM('beginner', 'intermediate', 'advanced');--> statement-breakpoint
 CREATE TYPE "public"."order_status" AS ENUM('pending', 'paid', 'failed', 'cancelled', 'refunded');--> statement-breakpoint
-CREATE TYPE "public"."payment_method" AS ENUM('mpesa', 'card', 'free');--> statement-breakpoint
-CREATE TYPE "public"."payment_provider" AS ENUM('mpesa', 'paystack', 'mock');--> statement-breakpoint
+CREATE TYPE "public"."payment_method" AS ENUM('card', 'free');--> statement-breakpoint
+CREATE TYPE "public"."payment_provider" AS ENUM('paystack', 'mock');--> statement-breakpoint
 CREATE TYPE "public"."payment_status" AS ENUM('pending', 'succeeded', 'failed', 'timeout', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."product_type" AS ENUM('ebook', 'course', 'tutorial', 'service', 'bundle');--> statement-breakpoint
 CREATE TYPE "public"."publish_status" AS ENUM('draft', 'published');--> statement-breakpoint
@@ -76,7 +76,7 @@ CREATE TABLE "coupons" (
 	"type" "coupon_type" NOT NULL,
 	"value" integer NOT NULL,
 	"active" boolean DEFAULT true NOT NULL,
-	"min_subtotal_kes" integer DEFAULT 0 NOT NULL,
+	"min_subtotal_cents" integer DEFAULT 0 NOT NULL,
 	"max_redemptions" integer,
 	"redemptions" integer DEFAULT 0 NOT NULL,
 	"expires_at" timestamp with time zone,
@@ -145,7 +145,7 @@ CREATE TABLE "order_items" (
 	"order_id" uuid NOT NULL,
 	"product_id" uuid NOT NULL,
 	"title" text NOT NULL,
-	"unit_price_kes" integer NOT NULL
+	"unit_price_cents" integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "orders" (
@@ -156,9 +156,9 @@ CREATE TABLE "orders" (
 	"phone" text,
 	"name" text,
 	"status" "order_status" DEFAULT 'pending' NOT NULL,
-	"subtotal_kes" integer NOT NULL,
-	"discount_kes" integer DEFAULT 0 NOT NULL,
-	"total_kes" integer NOT NULL,
+	"subtotal_cents" integer NOT NULL,
+	"discount_cents" integer DEFAULT 0 NOT NULL,
+	"total_cents" integer NOT NULL,
 	"coupon_code" text,
 	"marketing_consent" boolean DEFAULT false NOT NULL,
 	"paid_at" timestamp with time zone,
@@ -186,7 +186,7 @@ CREATE TABLE "payments" (
 	"provider" "payment_provider" NOT NULL,
 	"method" "payment_method" NOT NULL,
 	"status" "payment_status" DEFAULT 'pending' NOT NULL,
-	"amount_kes" integer NOT NULL,
+	"amount_cents" integer NOT NULL,
 	"reference" text NOT NULL,
 	"provider_ref" text,
 	"receipt_number" text,
@@ -217,8 +217,8 @@ CREATE TABLE "products" (
 	"subtitle" text DEFAULT '' NOT NULL,
 	"description" text DEFAULT '' NOT NULL,
 	"level" "level" DEFAULT 'beginner' NOT NULL,
-	"price_kes" integer DEFAULT 0 NOT NULL,
-	"sale_price_kes" integer,
+	"price_cents" integer DEFAULT 0 NOT NULL,
+	"sale_price_cents" integer,
 	"is_free" boolean DEFAULT false NOT NULL,
 	"status" "publish_status" DEFAULT 'draft' NOT NULL,
 	"is_sample" boolean DEFAULT false NOT NULL,

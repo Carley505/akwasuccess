@@ -70,14 +70,14 @@ export function ContactForm() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="contact-phone" label="Phone / M-Pesa number" optional>
+        <Field id="contact-phone" label="Phone number" optional>
           <Input
             id="contact-phone"
             name="phone"
             type="tel"
-            inputMode="numeric"
+            inputMode="tel"
             autoComplete="tel"
-            placeholder="0712 345 678"
+            placeholder="+1 555 234 5678"
           />
         </Field>
         <Field id="contact-topic" label="Topic">

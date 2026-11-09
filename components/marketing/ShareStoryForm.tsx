@@ -58,10 +58,10 @@ export function ShareStoryForm() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="story-name" label="Your name or initials">
-          <Input id="story-name" name="name" required placeholder="e.g. J. Mwangi" />
+          <Input id="story-name" name="name" required placeholder="e.g. A. Rivera" />
         </Field>
         <Field id="story-location" label="City / Country" optional>
-          <Input id="story-location" name="location" placeholder="e.g. Nairobi, Kenya" />
+          <Input id="story-location" name="location" placeholder="e.g. Toronto, Canada" />
         </Field>
       </div>
 

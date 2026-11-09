@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       await sendOrderReceiptEmail({
         email: user.email,
         orderNumber: "LIBRARY-RESEND",
-        totalKes: 0,
+        totalCents: 0,
         items,
         magicLinkUrl: absoluteUrl(`/api/auth/verify?token=${encodeURIComponent(rawLogin)}`),
       });

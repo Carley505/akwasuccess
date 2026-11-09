@@ -3,7 +3,6 @@ import { z } from "zod";
 import { issueMagicLoginToken } from "@/lib/auth";
 import { sendMagicLinkEmail } from "@/lib/email";
 import { checkRateLimit, clientIp } from "@/lib/security";
-import { absoluteUrl } from "@/lib/utils";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -33,16 +32,19 @@ export async function POST(req: NextRequest) {
     : "/account";
 
   const rawToken = await issueMagicLoginToken(email, redirectTo);
-  await sendMagicLinkEmail(email, rawToken);
+  const mailResult = await sendMagicLinkEmail(email, rawToken);
 
-  const isDev = process.env.NODE_ENV !== "production";
+  const showLocalVerifyUrl =
+    process.env.NODE_ENV !== "production" || mailResult.provider === "local-outbox";
 
   return NextResponse.json({
     message:
-      "We have sent a sign-in link to your email address. Click the link to open your account.",
-    // In local dev/test without external SMTP, return the preview link so E2E and the owner can click right through.
-    ...(isDev
-      ? { devVerifyUrl: absoluteUrl(`/api/auth/verify?token=${encodeURIComponent(rawToken)}`) }
+      mailResult.provider === "local-outbox"
+        ? "Local mode (no email API key configured yet): click the sign-in button below to open your account immediately."
+        : "We have sent a sign-in link to your email address. Click the link to open your account.",
+    // When running without an external SMTP/Resend key, return the verify URL so the owner can sign in immediately.
+    ...(showLocalVerifyUrl
+      ? { devVerifyUrl: `/api/auth/verify?token=${encodeURIComponent(rawToken)}` }
       : {}),
   });
 }

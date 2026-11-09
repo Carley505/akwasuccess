@@ -92,8 +92,8 @@ export default async function CoursesCatalogPage() {
 
                   <div className="border-line flex flex-wrap items-center justify-between gap-3 border-t pt-3">
                     <PriceTag
-                      amountKes={price}
-                      originalKes={onSale ? c.priceKes : null}
+                      amountCents={price}
+                      originalCents={onSale ? c.priceCents : null}
                       isFree={c.isFree}
                       comingSoon={!canBuy}
                     />

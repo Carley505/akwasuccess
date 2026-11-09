@@ -38,8 +38,8 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "timeout",
   "cancelled",
 ]);
-export const paymentProviderEnum = pgEnum("payment_provider", ["mpesa", "paystack", "mock"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["mpesa", "card", "free"]);
+export const paymentProviderEnum = pgEnum("payment_provider", ["paystack", "mock"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["card", "free"]);
 export const reviewStatusEnum = pgEnum("review_status", ["pending", "approved", "rejected"]);
 export const subscriberStatusEnum = pgEnum("subscriber_status", [
   "pending",
@@ -60,6 +60,15 @@ export type Faq = { q: string; a: string };
 export type ChangelogEntry = { date: string; note: string };
 export type Format = "PDF" | "EPUB" | "Video" | "Live" | "Service";
 export type LessonResource = { title: string; fileKey: string };
+export type WooDownloadRef = { id: string; name: string; file: string };
+export type PersistedCartItem = {
+  productId: string;
+  slug: string;
+  title: string;
+  type: string;
+  categorySlug: string;
+  priceCents: number;
+};
 
 /* ---------------------------------- users --------------------------------- */
 export const users = pgTable("users", {
@@ -69,6 +78,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   role: roleEnum("role").notNull().default("customer"),
   marketingConsent: boolean("marketing_consent").notNull().default(false),
+  wooCustomerId: integer("woo_customer_id"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   ...timestamps,
 });
@@ -108,9 +118,9 @@ export const products = pgTable(
     subtitle: text("subtitle").notNull().default(""),
     description: text("description").notNull().default(""),
     level: levelEnum("level").notNull().default("beginner"),
-    /** Whole Kenyan shillings. 0 + isFree=false means "price coming soon". */
-    priceKes: integer("price_kes").notNull().default(0),
-    salePriceKes: integer("sale_price_kes"),
+    /** Price in integer US cents (e.g. 1200 = $12.00). 0 + isFree=false means "price coming soon". */
+    priceCents: integer("price_cents").notNull().default(0),
+    salePriceCents: integer("sale_price_cents"),
     isFree: boolean("is_free").notNull().default(false),
     status: publishStatusEnum("status").notNull().default("draft"),
     /** Rows (or sample prices) that exist only for development/demo. Hidden in production. */
@@ -136,6 +146,11 @@ export const products = pgTable(
     popularity: integer("popularity").notNull().default(0),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
+    /** Authoritative WooCommerce product database ID when synced from WordPress. */
+    wooId: integer("woo_id").unique(),
+    /** Downloadable file references synced from WooCommerce. */
+    wooDownloads: jsonb("woo_downloads").$type<WooDownloadRef[]>().notNull().default([]),
+    wooSyncedAt: timestamp("woo_synced_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
@@ -162,7 +177,7 @@ export const coupons = pgTable("coupons", {
   type: couponTypeEnum("type").notNull(),
   value: integer("value").notNull(),
   active: boolean("active").notNull().default(true),
-  minSubtotalKes: integer("min_subtotal_kes").notNull().default(0),
+  minSubtotalCents: integer("min_subtotal_cents").notNull().default(0),
   maxRedemptions: integer("max_redemptions"),
   redemptions: integer("redemptions").notNull().default(0),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
@@ -179,19 +194,30 @@ export const orders = pgTable(
     phone: text("phone"),
     name: text("name"),
     status: orderStatusEnum("status").notNull().default("pending"),
-    subtotalKes: integer("subtotal_kes").notNull(),
-    discountKes: integer("discount_kes").notNull().default(0),
-    totalKes: integer("total_kes").notNull(),
+    subtotalCents: integer("subtotal_cents").notNull(),
+    discountCents: integer("discount_cents").notNull().default(0),
+    totalCents: integer("total_cents").notNull(),
     couponCode: text("coupon_code"),
     marketingConsent: boolean("marketing_consent").notNull().default(false),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     receiptSentAt: timestamp("receipt_sent_at", { withTimezone: true }),
     /** 0 = none sent, 1 = 1-hour reminder sent, 2 = 24-hour reminder sent. */
     abandonedStage: integer("abandoned_stage").notNull().default(0),
+    /** Linked WooCommerce order ID and order_key when created/synced via headless checkout. */
+    wooOrderId: integer("woo_order_id"),
+    wooOrderKey: text("woo_order_key"),
     ...timestamps,
   },
   (t) => [index("orders_user_idx").on(t.userId), index("orders_status_idx").on(t.status)],
 );
+
+export const carts = pgTable("carts", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  items: jsonb("items").$type<PersistedCartItem[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const orderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -202,7 +228,7 @@ export const orderItems = pgTable("order_items", {
     .notNull()
     .references(() => products.id),
   title: text("title").notNull(),
-  unitPriceKes: integer("unit_price_kes").notNull(),
+  unitPriceCents: integer("unit_price_cents").notNull(),
 });
 
 export const payments = pgTable(
@@ -215,10 +241,10 @@ export const payments = pgTable(
     provider: paymentProviderEnum("provider").notNull(),
     method: paymentMethodEnum("method").notNull(),
     status: paymentStatusEnum("status").notNull().default("pending"),
-    amountKes: integer("amount_kes").notNull(),
+    amountCents: integer("amount_cents").notNull(),
     /** Our reference, sent to the provider. */
     reference: text("reference").notNull().unique(),
-    /** Provider reference (e.g. M-Pesa CheckoutRequestID, receipt number). */
+    /** Provider reference (e.g. gateway transaction ID, receipt number). */
     providerRef: text("provider_ref"),
     receiptNumber: text("receipt_number"),
     phone: text("phone"),

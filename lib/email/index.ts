@@ -2,7 +2,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import { site } from "@/content/site";
-import { absoluteUrl, formatKes } from "@/lib/utils";
+import { absoluteUrl, formatMoney } from "@/lib/utils";
 
 export type EmailMessage = {
   to: string;
@@ -103,34 +103,45 @@ export async function sendMagicLinkEmail(email: string, rawToken: string) {
 export async function sendOrderReceiptEmail(opts: {
   email: string;
   orderNumber: string;
-  totalKes: number;
-  items: { title: string; downloadUrl?: string }[];
+  totalCents: number;
+  items: { title: string; downloadUrl?: string; accessUrl?: string }[];
   magicLinkUrl: string;
 }) {
   const listHtml = opts.items
     .map(
       (i) =>
-        `<li style="margin-bottom:8px;"><strong>${i.title}</strong>${
-          i.downloadUrl ? ` — <a href="${i.downloadUrl}" style="color:#0B6B3A;">Download</a>` : ""
+        `<li style="margin-bottom:10px;"><strong>${i.title}</strong>${
+          i.downloadUrl
+            ? ` — <a href="${i.downloadUrl}" style="color:#0B6B3A;font-weight:600;">Download (4-hour link)</a>`
+            : ""
+        }${
+          i.accessUrl
+            ? ` | <a href="${i.accessUrl}" style="color:#0B6B3A;font-weight:600;">Course &amp; Video Access Page</a>`
+            : ""
         }</li>`,
     )
     .join("");
 
   const listText = opts.items
-    .map((i) => `- ${i.title}${i.downloadUrl ? `: ${i.downloadUrl}` : ""}`)
+    .map(
+      (i) =>
+        `- ${i.title}${i.downloadUrl ? `\n  Download (valid 4 hours): ${i.downloadUrl}` : ""}${
+          i.accessUrl ? `\n  Course & Video Access: ${i.accessUrl}` : ""
+        }`,
+    )
     .join("\n");
 
   return sendEmail({
     to: opts.email,
-    subject: `Receipt & download links for Order #${opts.orderNumber}`,
+    subject: `Receipt & 4-hour download links for Order #${opts.orderNumber}`,
     html: wrapHtml(
       `Thank you for your order (#${opts.orderNumber})`,
-      `<p>We have confirmed your payment of <strong>${formatKes(opts.totalKes)}</strong>. Your digital items are ready below:</p>
+      `<p>We have confirmed your payment of <strong>${formatMoney(opts.totalCents)}</strong>. Your digital items and course access are ready below:</p>
        <ul>${listHtml}</ul>
-       <p>You can also re-download your files anytime from your Account Library.</p>`,
-      { label: "Open my Account Library", url: opts.magicLinkUrl },
+       <p>Each timed download link expires after <strong>4 hours</strong> for security. Sign in to your Account Library anytime to view your order history and generate fresh 4-hour download links.</p>`,
+      { label: "Sign in to my Account Library", url: opts.magicLinkUrl },
     ),
-    text: `Thank you for your order (#${opts.orderNumber}) — ${formatKes(opts.totalKes)}.\n\nYour items:\n${listText}\n\nOpen your library: ${opts.magicLinkUrl}`,
+    text: `Thank you for your order (#${opts.orderNumber}) — ${formatMoney(opts.totalCents)}.\n\nYour items (links expire after 4 hours):\n${listText}\n\nSign in to your Account Library anytime for fresh links and order history: ${opts.magicLinkUrl}`,
   });
 }
 

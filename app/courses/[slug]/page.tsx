@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock, PlayCircle } from "lucide-react";
 import { getCategory } from "@/content/categories";
+import { seedProducts } from "@/content/products";
 import { productDefaultFaqs } from "@/content/faqs";
 import { isSampleDataVisible } from "@/content/site";
 import { PageHeader, Section } from "@/components/ui/Layout";
@@ -20,6 +21,12 @@ import { effectivePrice, isOnSale, isPurchasable } from "@/lib/pricing";
 import { absoluteUrl } from "@/lib/utils";
 
 type Params = Promise<{ slug: string }>;
+
+export function generateStaticParams() {
+  return seedProducts
+    .filter((p) => p.type === "course" || p.type === "tutorial")
+    .map((p) => ({ slug: p.slug }));
+}
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
@@ -46,8 +53,8 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
   const hideSamplePrice = product.isSample && !isSampleDataVisible;
   const displayProduct = {
     ...product,
-    priceKes: hideSamplePrice ? 0 : product.priceKes,
-    salePriceKes: hideSamplePrice ? null : product.salePriceKes,
+    priceCents: hideSamplePrice ? 0 : product.priceCents,
+    salePriceCents: hideSamplePrice ? null : product.salePriceCents,
   };
 
   const price = effectivePrice(displayProduct);
@@ -164,7 +171,7 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
               <h2 className="text-xl font-bold">Your instructor — Akwasuccess</h2>
               <p className="text-muted text-sm">
                 Taught in a calm, structured style focused on practical understanding, safety, and
-                real East African context.Includes a downloadable PDF certificate upon completion.
+                real-world context. Includes a downloadable PDF certificate upon completion.
               </p>
             </div>
 
@@ -188,8 +195,8 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
             <div className="card space-y-5 p-6">
               <div className="flex items-baseline justify-between gap-2">
                 <PriceTag
-                  amountKes={price}
-                  originalKes={onSale ? displayProduct.priceKes : null}
+                  amountCents={price}
+                  originalCents={onSale ? displayProduct.priceCents : null}
                   isFree={displayProduct.isFree}
                   comingSoon={!canBuy}
                   size="lg"
@@ -204,8 +211,8 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
                   title: product.title,
                   type: product.type,
                   categorySlug: product.categorySlug,
-                  priceKes: displayProduct.priceKes,
-                  salePriceKes: displayProduct.salePriceKes,
+                  priceCents: displayProduct.priceCents,
+                  salePriceCents: displayProduct.salePriceCents,
                   isFree: displayProduct.isFree,
                 }}
               />

@@ -4,8 +4,14 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, FormAlert, Input } from "@/components/ui/Form";
 
-export function MagicLinkLoginForm({ redirectTo = "/account" }: { redirectTo?: string }) {
-  const [email, setEmail] = useState("");
+export function MagicLinkLoginForm({
+  redirectTo = "/account",
+  defaultEmail = "",
+}: {
+  redirectTo?: string;
+  defaultEmail?: string;
+}) {
+  const [email, setEmail] = useState(defaultEmail);
   const [loading, setLoading] = useState(false);
   const [devUrl, setDevUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<{ tone: "success" | "error"; message: string } | null>(null);
@@ -66,12 +72,15 @@ export function MagicLinkLoginForm({ redirectTo = "/account" }: { redirectTo?: s
       {status && <FormAlert tone={status.tone}>{status.message}</FormAlert>}
 
       {devUrl && (
-        <p className="border-line bg-surface-2 rounded border p-3 text-xs">
-          <strong>Development preview link:</strong>{" "}
-          <a href={devUrl} className="link font-semibold">
-            Click here to complete sign-in immediately
+        <div className="border-primary bg-tint space-y-2 rounded-lg border p-4 text-sm">
+          <p className="font-semibold">Instant Local Sign-In Ready:</p>
+          <a
+            href={devUrl}
+            className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 font-semibold no-underline"
+          >
+            Click here to complete sign-in now →
           </a>
-        </p>
+        </div>
       )}
 
       <Button type="submit" loading={loading}>

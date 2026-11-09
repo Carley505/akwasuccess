@@ -3,7 +3,7 @@ import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const control =
-  "w-full min-h-12 rounded-md border border-line bg-surface px-3.5 py-2.5 text-fg placeholder:text-muted/80 transition-colors focus:border-primary focus:outline-2 focus:outline-offset-0 focus:outline-[var(--focus)] aria-[invalid=true]:border-danger";
+  "w-full max-w-full min-w-0 min-h-12 rounded-md border border-line-strong bg-surface px-3.5 py-2.5 text-fg placeholder:text-muted/90 transition-colors focus:border-primary focus:outline-2 focus:outline-offset-0 focus:outline-[var(--focus)] aria-[invalid=true]:border-danger file:mr-3 file:rounded file:border-0 file:bg-tint file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-link";
 
 export function Field({
   id,
@@ -68,7 +68,7 @@ export function Select({ className, children, ...props }: ComponentProps<"select
 /** Hidden honeypot field for spam protection. Real users never see or fill it. */
 export function Honeypot() {
   return (
-    <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+    <div aria-hidden="true" className="sr-only pointer-events-none">
       <label htmlFor="company_website">Leave this field empty</label>
       <input id="company_website" name="company_website" type="text" tabIndex={-1} autoComplete="off" />
     </div>

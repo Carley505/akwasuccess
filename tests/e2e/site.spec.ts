@@ -29,27 +29,33 @@ test.describe("Responsive & Accessibility checks", () => {
     }
   });
 
-  test("Zero critical or serious axe accessibility issues on Home and Product page", async ({
+  test("Zero critical or serious axe accessibility issues on Home and Product page (Light & Dark themes)", async ({
     page,
   }) => {
     for (const route of [
       "/",
       "/shop/basic-electrical-electronics-instrumentation-automation-ebook",
     ]) {
-      await page.goto(route);
-      const results = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-        .analyze();
-      const seriousOrCritical = results.violations.filter(
-        (v) => v.impact === "critical" || v.impact === "serious",
-      );
-      expect(seriousOrCritical).toEqual([]);
+      for (const theme of ["light", "dark"] as const) {
+        await page.goto(route);
+        await page.evaluate((t) => {
+          window.localStorage.setItem("akwa:theme", t);
+          document.documentElement.setAttribute("data-theme", t);
+        }, theme);
+        const results = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+          .analyze();
+        const seriousOrCritical = results.violations.filter(
+          (v) => v.impact === "critical" || v.impact === "serious",
+        );
+        expect(seriousOrCritical, `Axe violations in ${theme} theme on ${route}`).toEqual([]);
+      }
     }
   });
 });
 
 test.describe("Commerce & Redirect flows", () => {
-  test("End-to-end guest checkout with M-Pesa STK Push sandbox and instant PDF download", async ({
+  test("End-to-end guest checkout with USD card payment and instant PDF download", async ({
     page,
   }) => {
     await page.goto("/shop/cryptocurrency-for-beginners");
@@ -62,14 +68,7 @@ test.describe("Commerce & Redirect flows", () => {
     await expect(page).toHaveURL(/\/checkout/);
 
     await page.getByLabel("Email address").fill("buyer@example.com");
-    await page.getByLabel("M-Pesa phone number").fill("0712 345 678");
-    await page.getByRole("button", { name: /Pay .* with M-Pesa/i }).click();
-
-    // Waiting screen appears -> click Simulate PIN Approved
-    await expect(
-      page.getByRole("heading", { name: /Check your phone and enter your M-Pesa PIN/i }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Simulate PIN Approved" }).click();
+    await page.getByRole("button", { name: /Pay .* securely/i }).click();
 
     // Redirected to order confirmation with instant download link
     await expect(page).toHaveURL(/\/checkout\/order\//);

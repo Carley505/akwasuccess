@@ -55,10 +55,17 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // PGlite ships WebAssembly + data files that must not be bundled.
   serverExternalPackages: ["@electric-sql/pglite"],
+  outputFileTracingIncludes: {
+    "/*": ["./drizzle/**/*", "./content/**/*"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536, 1920],
     qualities: [60, 75],
+    remotePatterns: [
+      { protocol: "https", hostname: "cms.akwasuccess.com" },
+      { protocol: "https", hostname: "akwasuccess.com" },
+    ],
   },
   async redirects() {
     return legacyRedirects.flatMap(([source, destination]) => [

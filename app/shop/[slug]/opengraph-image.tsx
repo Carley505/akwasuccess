@@ -42,7 +42,7 @@ export default async function ProductOgImage({
           <div style={{ fontSize: 26, color: "#E6F3EB" }}>{subtitle}</div>
         </div>
         <div style={{ fontSize: 22, color: "#E6F3EB" }}>
-          Instant download • Pay securely with M-Pesa or Card
+          Instant download • Secure USD Card Checkout
         </div>
       </div>
     ),

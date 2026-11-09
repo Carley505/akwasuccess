@@ -22,8 +22,8 @@ export type ProductCardData = {
   title: string;
   subtitle?: string;
   level: Level;
-  priceKes: number;
-  salePriceKes?: number | null;
+  priceCents: number;
+  salePriceCents?: number | null;
   isFree: boolean;
   isSample?: boolean;
   formats?: string[];
@@ -53,15 +53,15 @@ export function ProductCard({ product }: { product: ProductCardData }) {
       title: product.title,
       type: product.type,
       categorySlug: product.categorySlug,
-      priceKes: price,
+      priceCents: price,
     });
-    track("add_to_cart", { slug: product.slug, priceKes: price });
+    track("add_to_cart", { slug: product.slug, priceCents: price });
     showToast(`Added "${product.title}" to cart`);
   }
 
   return (
-    <article className="card @container flex h-full flex-col overflow-hidden p-4 transition-colors hover:border-primary">
-      <Link href={href} className="mx-auto block w-full max-w-[200px] no-underline">
+    <article className="card @container flex h-full min-w-0 flex-col overflow-hidden p-4 transition-colors hover:border-primary">
+      <Link href={href} className="mx-auto block w-full max-w-[180px] no-underline sm:max-w-[200px]">
         <BookMockup
           title={product.title}
           subtitle={product.subtitle}
@@ -71,7 +71,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
         />
       </Link>
 
-      <div className="mt-4 flex flex-1 flex-col justify-between gap-3">
+      <div className="mt-4 flex min-w-0 flex-1 flex-col justify-between gap-3">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
             {cat && <Badge tone="green">{cat.shortName}</Badge>}
@@ -100,8 +100,8 @@ export function ProductCard({ product }: { product: ProductCardData }) {
 
         <div className="border-line flex flex-col gap-2.5 border-t pt-3 @[260px]:flex-row @[260px]:items-center @[260px]:justify-between">
           <PriceTag
-            amountKes={price}
-            originalKes={onSale ? product.priceKes : null}
+            amountCents={price}
+            originalCents={onSale ? product.priceCents : null}
             isFree={product.isFree}
             comingSoon={!canBuy}
             size="md"

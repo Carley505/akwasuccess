@@ -1,6 +1,6 @@
 /**
- * UI strings (English, Kenya). Components read strings via `t()` from
- * lib/i18n so a Swahili dictionary (sw.ts) can be added later with the same keys.
+ * UI strings (English). Components read strings via `t()` from
+ * lib/i18n so additional locale dictionaries can be added later with the same keys.
  */
 export const en = {
   nav: {
@@ -47,10 +47,10 @@ export const en = {
     notifyMe: "Notify me",
   },
   trust: {
-    payments: "Secure M-Pesa & card payments",
+    payments: "Secure USD card payments",
     instant: "Instant download",
     beginner: "Beginner-friendly",
-    paySecurely: "Pay securely with M-Pesa or card",
+    paySecurely: "Pay securely by card in USD",
     privacy: "We respect your privacy. Unsubscribe any time.",
   },
   product: {
@@ -61,7 +61,7 @@ export const en = {
   },
   footer: {
     blurb:
-      "Practical knowledge on finance, the digital economy and technology, written for beginners in Kenya, East Africa and beyond.",
+      "Practical knowledge on finance, the digital economy and technology, written in clear English for learners worldwide.",
     shop: "Shop",
     learnServices: "Learn & Services",
     company: "Company & Legal",

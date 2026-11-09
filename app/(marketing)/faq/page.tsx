@@ -9,7 +9,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 export const metadata: Metadata = {
   title: "Frequently Asked Questions (FAQ)",
   description:
-    "Answers to common questions about buying Akwasuccess eBooks with M-Pesa or card, instant downloads, courses, and consulting.",
+    "Answers to common questions about buying Akwasuccess eBooks with USD card checkout, instant downloads, courses, and consulting.",
   alternates: { canonical: "/faq" },
 };
 
@@ -20,7 +20,7 @@ export default function FaqPage() {
     <>
       <PageHeader
         title="Frequently Asked Questions"
-        intro="Everything you need to know about M-Pesa and card checkout, instant eBook delivery, device compatibility, and our educational policy."
+        intro="Everything you need to know about USD card checkout, instant eBook delivery, device compatibility, and our educational policy."
         breadcrumbs={<Breadcrumbs items={[{ name: "FAQ" }]} />}
       />
 
@@ -37,7 +37,7 @@ export default function FaqPage() {
           <p className="text-muted text-center text-sm">
             Still need help?{" "}
             <Link href="/contact" className="link">
-              Send us a message or chat on WhatsApp
+              Send us a message
             </Link>
             .
           </p>

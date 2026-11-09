@@ -17,8 +17,16 @@
 }
 
 /* ------------------------------------------------------------------
-   Design tokens (spec section 3.2). Brand values are fixed; semantic
-   tokens switch for dark mode via prefers-color-scheme.
+   Design tokens (spec section 3.2).
+
+   Brand values are fixed. SEMANTIC tokens (surface, text, border, link...)
+   switch per theme. Light values live in :root; dark values are written
+   ONCE in the `theme-dark` utility below and applied to both dark entry
+   points:
+     1. :root[data-theme="dark"]       explicit choice / resolved system theme
+     2. prefers-color-scheme: dark     no-JS fallback while the user has not
+                                       explicitly chosen light
+   JS (lib/theme.ts) always sets data-theme="light|dark" before first paint.
    ------------------------------------------------------------------ */
 :root {
   --font-fraunces: "Fraunces";
@@ -39,11 +47,9 @@
   --paper: #ffffff;
   --paper-2: #faf8f3;
 
-  /* Status */
-  --success: #0b6b3a;
-  --warning: #b7791f;
-  --danger: #b42318;
-  --info: #175cd3;
+  /* Theme-independent solids (white text on these passes AA in both themes) */
+  --danger-solid: #b42318;
+  --info-solid: #175cd3;
 
   /* Semantic (light) */
   --surface: var(--paper);
@@ -52,6 +58,7 @@
   --text: var(--ink-900);
   --text-muted: var(--ink-600);
   --border: var(--ink-300);
+  --border-strong: #6b7b73; /* form-control borders, >= 3:1 on surface */
   --primary: var(--green-700);
   --primary-hover: var(--green-600);
   --primary-fg: #ffffff;
@@ -59,39 +66,99 @@
   --tint: var(--green-100);
   --tint-gold: var(--gold-100);
   --gold-text: var(--gold-700);
+  --star: #9a7209; /* rating stars, >= 3:1 on surface */
   --focus: var(--green-700);
+  --success: var(--green-700);
+  --warning: #8a5a0b;
+  --danger: #b42318;
+  --info: #175cd3;
+  --overlay: rgba(8, 20, 14, 0.5);
 
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(8, 71, 42, 0.08);
+  --shadow-edge: rgba(0, 0, 0, 0.06);
+  --shadow-glow: rgba(8, 71, 42, 0.08);
+  --shadow-soft: 0 1px 2px var(--shadow-edge), 0 8px 24px var(--shadow-glow);
   --header-h: 72px;
   --bottom-nav-h: 64px;
 
   color-scheme: light dark;
 }
 
+/* Single source of truth for dark tokens. */
+@utility theme-dark {
+  --surface: #0d1a13;
+  --surface-2: #11231a;
+  --surface-raised: #152a1f;
+  --text: #e8efea;
+  --text-muted: #a9b8af;
+  --border: #2c4136;
+  --border-strong: #6f8a7b;
+  --primary: var(--green-600);
+  --primary-hover: var(--green-700);
+  --primary-fg: #ffffff;
+  --link: #3fb57a;
+  --tint: #163626;
+  --tint-gold: #2e2710;
+  --gold-text: #e3b94a;
+  --star: var(--gold-500);
+  --focus: #3fb57a;
+  --success: #3fb57a;
+  --warning: #e3b94a;
+  --danger: #f97066;
+  --info: #7cb0ff;
+  --overlay: rgba(0, 0, 0, 0.65);
+  --shadow-edge: rgba(0, 0, 0, 0.45);
+  --shadow-glow: rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  @apply theme-dark;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #0d1a13;
-    --surface-2: #11231a;
-    --surface-raised: #152a1f;
-    --text: #e8efea;
-    --text-muted: #a9b8af;
-    --border: #2c4136;
-    --primary: var(--green-700);
-    --primary-hover: var(--green-600);
-    --primary-fg: #ffffff;
-    --link: #3fb57a;
-    --tint: #163626;
-    --tint-gold: #2e2710;
-    --gold-text: #e3b94a;
-    --focus: #3fb57a;
-    --danger: #f97066;
-    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  :root[data-theme-pref="system"]:not([data-theme="light"]) {
+    @apply theme-dark;
+  }
+}
+
+/* Tailwind `dark:` variant follows the same condition as the tokens. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root[data-theme-pref="system"]:not([data-theme="light"]), :root[data-theme-pref="system"]:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+/* Surfaces that stay dark green in both themes (footer, hero band, course player) */
+.on-dark {
+  --focus: #f2cf6b;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme-transition],
+  html[data-theme-transition] *,
+  html[data-theme-transition] *::before,
+  html[data-theme-transition] *::after {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      fill 150ms ease,
+      stroke 150ms ease !important;
   }
 }
 
 @theme inline {
   /* Breakpoints (spec 6.1). Base = xs (320px). */
-  --breakpoint-sm: 30rem; /* 480px */
+  --breakpoint-sm: 40rem; /* 640px */
   --breakpoint-md: 48rem; /* 768px */
   --breakpoint-lg: 64rem; /* 1024px */
   --breakpoint-xl: 80rem; /* 1280px */
@@ -120,6 +187,7 @@
   --color-fg: var(--text);
   --color-muted: var(--text-muted);
   --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-fg: var(--primary-fg);
@@ -127,6 +195,10 @@
   --color-tint: var(--tint);
   --color-tint-gold: var(--tint-gold);
   --color-gold-text: var(--gold-text);
+  --color-star: var(--star);
+  --color-danger-solid: var(--danger-solid);
+  --color-info-solid: var(--info-solid);
+  --color-overlay: var(--overlay);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
@@ -134,11 +206,11 @@
   /* Fluid type scale (spec 3.3) */
   --text-xs: clamp(0.75rem, 0.73rem + 0.1vw, 0.8125rem);
   --text-sm: clamp(0.875rem, 0.85rem + 0.12vw, 0.9375rem);
-  --text-base: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
-  --text-lg: clamp(1.125rem, 1.05rem + 0.4vw, 1.375rem);
-  --text-xl: clamp(1.375rem, 1.2rem + 0.9vw, 1.875rem);
-  --text-2xl: clamp(1.75rem, 1.4rem + 1.8vw, 2.75rem);
-  --text-3xl: clamp(2.125rem, 1.6rem + 2.8vw, 3.75rem);
+  --text-base: clamp(0.96875rem, 0.94rem + 0.18vw, 1.0625rem);
+  --text-lg: clamp(1.0625rem, 1rem + 0.35vw, 1.3125rem);
+  --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.75rem);
+  --text-2xl: clamp(1.5rem, 1.25rem + 1.4vw, 2.5rem);
+  --text-3xl: clamp(1.75rem, 1.35rem + 2.1vw, 3.25rem);
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -150,10 +222,19 @@
 
 /* ------------------------------------------------------------------ */
 @layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     scroll-padding-top: calc(var(--header-h) + 16px);
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
@@ -163,9 +244,17 @@
     font-size: var(--text-base);
     line-height: 1.6;
     min-height: 100dvh;
+    width: 100%;
+    max-width: 100%;
     overflow-x: clip;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Prevent CSS Grid and container children from expanding past viewport width */
+  .grid > *,
+  .container-site > * {
+    min-width: 0;
   }
 
   h1,
@@ -211,6 +300,13 @@
     font-size: max(16px, 1rem);
   }
 
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    box-shadow: 0 0 0 1000px var(--surface) inset;
+  }
+
   :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
@@ -221,25 +317,34 @@
     background: var(--tint);
   }
 
-  pre,
-  code {
+  pre {
     overflow-x: auto;
+    max-width: 100%;
+  }
+  code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  pre code {
+    overflow-wrap: normal;
+    word-break: normal;
   }
   table {
     border-collapse: collapse;
+    max-width: 100%;
   }
 }
 
 @layer components {
   .container-site {
     width: 100%;
-    max-width: 1200px;
+    max-width: min(1200px, 100%);
     margin-inline: auto;
     padding-inline: clamp(16px, 4vw, 32px);
   }
 
   .section-y {
-    padding-block: clamp(48px, 8vw, 96px);
+    padding-block: clamp(40px, 7vw, 96px);
   }
 
   /* Small gold underline under section headings. */
@@ -260,6 +365,7 @@
     background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
+    min-width: 0;
   }
 
   .link {
@@ -326,6 +432,24 @@
   .prose-site strong {
     font-weight: 650;
   }
+  .prose-site code {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.125em 0.375em;
+    font-size: 0.9em;
+  }
+  .prose-site pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.875em 1em;
+  }
+  .prose-site pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
   .prose-site .callout {
     border-left-width: 3px;
     border-left-style: solid;
@@ -336,17 +460,11 @@
 
   .scroll-snap-row {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(240px, 78%);
+    grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 16px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    overscroll-behavior-x: contain;
-    padding-bottom: 8px;
-    scrollbar-width: thin;
-  }
-  .scroll-snap-row > * {
-    scroll-snap-align: start;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   /* Space reserved at page bottom for the fixed bottom nav on phones. */

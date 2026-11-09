@@ -35,22 +35,22 @@ export default async function HomePage() {
   return (
     <>
       {/* 1. Hero */}
-      <section className="bg-surface-2 border-line border-b py-12 md:py-20">
-        <div className="container-site grid items-center gap-10 lg:grid-cols-12">
-          <div className="space-y-6 lg:col-span-7">
-            <p className="text-gold-text text-sm font-bold tracking-wider uppercase">
+      <section className="bg-surface-2 border-line w-full max-w-full overflow-x-clip border-b py-10 sm:py-12 md:py-20">
+        <div className="container-site grid items-center gap-8 sm:gap-10 lg:grid-cols-12">
+          <div className="min-w-0 space-y-5 sm:space-y-6 lg:col-span-7">
+            <p className="text-gold-text text-xs font-bold tracking-wider uppercase sm:text-sm">
               {site.name} • {site.tagline}
             </p>
             <h1 className="gold-rule text-3xl">
               Learn practical skills for money, technology and life.
             </h1>
-            <p className="text-muted max-w-xl text-lg">
+            <p className="text-muted max-w-xl text-base sm:text-lg">
               Beginner-friendly eBooks, courses, tutorials and one-on-one consulting on
               cryptocurrency, personal finance, electrical &amp; automation skills, and everyday
               wellbeing.
             </p>
 
-            <div className="flex flex-wrap gap-3 pt-1">
+            <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap">
               <LinkButton href="/shop" size="lg">
                 {t.actions.browseEbooks}
               </LinkButton>
@@ -63,8 +63,8 @@ export default async function HomePage() {
           </div>
 
           {/* Flat 3-book mockup showcase (right on desktop, below on mobile) */}
-          <div className="lg:col-span-5">
-            <div className="mx-auto grid max-w-md grid-cols-3 items-end gap-3 sm:gap-4">
+          <div className="min-w-0 lg:col-span-5">
+            <div className="mx-auto grid max-w-sm grid-cols-3 items-end gap-2.5 sm:max-w-md sm:gap-4">
               {heroBooks.map((b, idx) => (
                 <Link
                   key={b.id}
@@ -91,7 +91,7 @@ export default async function HomePage() {
           id="pillars-heading"
           eyebrow="Five learning pillars"
           title="Choose what you want to understand next"
-          intro="Clear, structured education written for beginners in Kenya, East Africa and beyond."
+          intro="Clear, structured education written for beginners worldwide."
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {categories.map((cat) => (
@@ -119,8 +119,8 @@ export default async function HomePage() {
           }
         />
 
-        {/* Horizontal scroll-snap on mobile, 4-col grid on desktop */}
-        <div className="scroll-snap-row sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">
+        {/* 1-col on mobile, 2-col on tablet, 4-col on desktop */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {featured.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
@@ -165,28 +165,28 @@ export default async function HomePage() {
 
       {/* 6. Free resource / lead magnet */}
       <Section tone="tint" labelledBy="lead-magnet-heading">
-        <div className="grid items-center gap-8 lg:grid-cols-12">
-          <div className="space-y-3 lg:col-span-7">
+        <div className="grid items-center gap-6 sm:gap-8 lg:grid-cols-12">
+          <div className="min-w-0 space-y-3 lg:col-span-7">
             <Badge tone="gold">Free PDF checklist</Badge>
             <h2 id="lead-magnet-heading" className="gold-rule text-2xl">
               Free: Cryptocurrency Safety Checklist (PDF)
             </h2>
             <p className="text-muted max-w-xl">
               Not ready to buy yet? Start with our one-page safety checklist covering recovery
-              phrases, wallet security, and how to spot common M-Pesa P2P scams.
+              phrases, wallet security, and how to spot common P2P scams.
             </p>
             <p className="text-sm">
               <a
                 href="/samples/crypto-safety-checklist.pdf"
                 download
-                className="link inline-flex items-center gap-1.5 font-semibold"
+                className="link inline-flex flex-wrap items-center gap-1.5 font-semibold"
               >
-                <FileDown className="size-4" aria-hidden />
-                Or download the PDF directly right now
+                <FileDown className="size-4 shrink-0" aria-hidden />
+                <span>Or download the PDF directly right now</span>
               </a>
             </p>
           </div>
-          <div className="card p-6 lg:col-span-5">
+          <div className="card min-w-0 p-4 sm:p-6 lg:col-span-5">
             <NewsletterForm
               source="home-lead-magnet"
               buttonLabel="Send me the checklist"
@@ -198,15 +198,15 @@ export default async function HomePage() {
 
       {/* 7. About snippet */}
       <Section labelledBy="about-snippet-heading">
-        <div className="grid items-center gap-8 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <div className="card bg-surface-2 flex aspect-[4/3] flex-col items-center justify-center p-6 text-center">
+        <div className="grid items-center gap-6 sm:gap-8 lg:grid-cols-12">
+          <div className="min-w-0 lg:col-span-4">
+            <div className="card bg-surface-2 flex aspect-[4/3] flex-col items-center justify-center p-5 text-center sm:p-6">
               <div className="bg-tint text-link mb-3 grid size-16 place-items-center rounded-full font-serif text-2xl font-bold">
                 AS
               </div>
               <p className="font-serif text-lg font-bold">Founder, Akwasuccess</p>
               <p className="text-muted mt-1 text-xs">
-                Nairobi, Kenya • Technical &amp; Financial Educator
+                Technical &amp; Financial Educator • Global Online Platform
               </p>
               <p className="text-muted mt-2 text-[11px]">
                 {/* TODO: owner to supply real founder photo */}
@@ -285,7 +285,7 @@ export default async function HomePage() {
                 {
                   icon: BookOpen,
                   title: "Written in plain English",
-                  body: "Every concept is explained from scratch with relatable East African and global examples.",
+                  body: "Every concept is explained from scratch with relatable, real-world examples for learners everywhere.",
                 },
                 {
                   icon: ShieldCheck,
@@ -295,7 +295,7 @@ export default async function HomePage() {
                 {
                   icon: CheckCircle2,
                   title: "Read on any device, keep forever",
-                  body: "Pay in under a minute with M-Pesa or card, download your PDF immediately, and get free future updates.",
+                  body: "Pay securely in under a minute by card in USD, download your PDF immediately, and get free future updates.",
                 },
               ].map(({ icon: Icon, title, body }) => (
                 <div key={title} className="card p-5">
@@ -350,8 +350,7 @@ export default async function HomePage() {
               </h3>
               <p className="text-muted mt-2 text-sm">
                 Safe, reliable electrical wiring, troubleshooting, instrumentation, and automation
-                support for homes, workshops, and industrial facilities in Nairobi and surrounding
-                areas.
+                support for homes, workshops, and industrial facilities.
               </p>
             </div>
             <div className="mt-6">
@@ -414,7 +413,7 @@ export default async function HomePage() {
           id="faq-heading"
           eyebrow="Common questions"
           title="Frequently asked questions"
-          intro="Clear answers on M-Pesa payments, instant delivery, device support, and refunds."
+          intro="Clear answers on USD card payments, instant delivery, device support, and refunds."
         />
         <div className="mx-auto max-w-3xl">
           <Accordion
@@ -459,7 +458,7 @@ export default async function HomePage() {
           <p className="mt-3 text-white/85">
             Explore our beginner-friendly eBooks or start with a free guide at your own pace.
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap">
             <LinkButton href="/shop" size="lg">
               {t.actions.browseEbooks}
             </LinkButton>

@@ -34,4 +34,4 @@ For example, if a 12 V supply powers a lamp with a resistance of 6 Ω, the curre
 
 ## Safety first
 
-Even low voltages can cause burns or fires if a short circuit produces high current, and mains voltage (240 V AC in Kenya) can be fatal. Always switch off and isolate the circuit breaker, lock it out where possible, and test with a known working multimeter before working on any wiring.
+Even low voltages can cause burns or fires if a short circuit produces high current, and mains voltage (120 V – 240 V AC) can be fatal. Always switch off and isolate the circuit breaker, lock it out where possible, and test with a known working multimeter before working on any wiring.

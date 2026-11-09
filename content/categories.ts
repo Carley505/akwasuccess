@@ -2,7 +2,13 @@
  * The five content pillars. Slugs are used in URLs (/shop/[category]).
  * Icons are Lucide icon names resolved in components/ui/CategoryIcon.tsx.
  */
-export type CategorySlug = "crypto" | "finance" | "technical" | "psychology" | "services";
+export type CategorySlug =
+  | "crypto"
+  | "finance"
+  | "technical"
+  | "psychology"
+  | "marketing"
+  | "services";
 
 export type Category = {
   slug: CategorySlug;
@@ -10,7 +16,7 @@ export type Category = {
   shortName: string;
   description: string;
   topics: string[];
-  icon: "coins" | "wallet" | "cpu" | "brain" | "briefcase";
+  icon: "coins" | "wallet" | "cpu" | "brain" | "megaphone" | "briefcase";
   disclaimer?: "crypto" | "health";
   /** Where the category card links to. */
   href: string;
@@ -92,6 +98,23 @@ export const categories: Category[] = [
     icon: "brain",
     disclaimer: "health",
     href: "/shop/psychology",
+  },
+  {
+    slug: "marketing",
+    name: "Digital & Social Media Marketing",
+    shortName: "Marketing",
+    description:
+      "Practical social media growth, content strategy, and campaign training for TikTok, Instagram, and Facebook.",
+    topics: [
+      "TikTok marketing strategy",
+      "Instagram brand growth",
+      "Facebook organic & paid campaigns",
+      "Audience building",
+      "Content creation",
+      "Social commerce",
+    ],
+    icon: "megaphone",
+    href: "/shop/marketing",
   },
   {
     slug: "services",

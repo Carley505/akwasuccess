@@ -3,7 +3,8 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { BookOpen, FileDown } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { getDb, schema as s } from "@/lib/db";
-import { createSignedDownloadToken } from "@/lib/storage";
+import { DOWNLOAD_EXPIRY_HOURS, createSignedDownloadToken } from "@/lib/storage";
+import { syncUserWooOrders } from "@/lib/woocommerce";
 import { PageHeader, Section } from "@/components/ui/Layout";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { LinkButton } from "@/components/ui/Button";
@@ -25,7 +26,7 @@ export default async function AccountLibraryPage() {
       <>
         <PageHeader
           title="My Digital Library"
-          intro="Sign in with your email magic link or resend your download links below."
+          intro={`Sign in with your email magic link to access your purchased eBooks and courses or generate fresh ${DOWNLOAD_EXPIRY_HOURS}-hour download links.`}
           breadcrumbs={[
             <Breadcrumbs
               key="b"
@@ -42,6 +43,8 @@ export default async function AccountLibraryPage() {
       </>
     );
   }
+
+  await syncUserWooOrders(user).catch(() => {});
 
   const db = await getDb();
   const ents = await db
@@ -86,7 +89,7 @@ export default async function AccountLibraryPage() {
     <>
       <PageHeader
         title="My Digital Library"
-        intro="Every eBook and course you own. Signed download links expire after 10 minutes—refresh this page anytime for a new link."
+        intro={`Every eBook and course you own. Each signed download link is valid for ${DOWNLOAD_EXPIRY_HOURS} hours—refresh this page anytime to generate a fresh ${DOWNLOAD_EXPIRY_HOURS}-hour link.`}
         breadcrumbs={[
           <Breadcrumbs
             key="b"
@@ -112,7 +115,10 @@ export default async function AccountLibraryPage() {
                 className="card flex flex-col justify-between gap-4 p-6"
               >
                 <div>
-                  <Badge tone="green">{product.type}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="green">{product.type}</Badge>
+                    <span className="text-link text-xs font-semibold">Access Confirmed</span>
+                  </div>
                   <h2 className="mt-2 text-xl font-bold">{product.title}</h2>
                   {product.subtitle && (
                     <p className="text-muted mt-1 text-sm">{product.subtitle}</p>
@@ -125,17 +131,19 @@ export default async function AccountLibraryPage() {
                       className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 items-center gap-2 rounded-md px-4 text-sm font-semibold no-underline"
                     >
                       <FileDown className="size-4" aria-hidden />
-                      <span>Download ({format})</span>
+                      <span>
+                        Download {format} ({DOWNLOAD_EXPIRY_HOURS}h link)
+                      </span>
                     </a>
                   )}
-                  {product.type === "course" && (
+                  {(product.type === "course" || product.type === "tutorial") && (
                     <LinkButton
                       href={`/account/courses/${product.slug}`}
                       size="sm"
                       variant="secondary"
                       icon={<BookOpen className="size-4" aria-hidden />}
                     >
-                      Open course player
+                      Open course &amp; video player
                     </LinkButton>
                   )}
                 </div>

@@ -20,8 +20,8 @@ export function ProductBuyActions({
     title: string;
     type: string;
     categorySlug: string;
-    priceKes: number;
-    salePriceKes: number | null;
+    priceCents: number;
+    salePriceCents: number | null;
     isFree: boolean;
     sampleFileKey?: string | null;
   };
@@ -37,7 +37,7 @@ export function ProductBuyActions({
   const onSale = isOnSale(product);
 
   useEffect(() => {
-    track("product_view", { slug: product.slug, priceKes: price });
+    track("product_view", { slug: product.slug, priceCents: price });
   }, [product.slug, price]);
 
   useEffect(() => {
@@ -62,9 +62,9 @@ export function ProductBuyActions({
       title: product.title,
       type: product.type,
       categorySlug: product.categorySlug,
-      priceKes: price,
+      priceCents: price,
     });
-    track("add_to_cart", { slug: product.slug, priceKes: price });
+    track("add_to_cart", { slug: product.slug, priceCents: price });
   }
 
   function handleBuyNow() {
@@ -141,8 +141,8 @@ export function ProductBuyActions({
           <div>
             <p className="line-clamp-1 text-xs font-medium">{product.title}</p>
             <PriceTag
-              amountKes={price}
-              originalKes={onSale ? product.priceKes : null}
+              amountCents={price}
+              originalCents={onSale ? product.priceCents : null}
               isFree={product.isFree}
               size="sm"
             />

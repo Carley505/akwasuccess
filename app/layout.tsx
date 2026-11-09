@@ -9,6 +9,7 @@ import { ToastRegion } from "@/components/ui/Toast";
 import { ServiceWorkerRegister } from "@/components/layout/ServiceWorkerRegister";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { t } from "@/lib/i18n";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { absoluteUrl } from "@/lib/utils";
 
 export const viewport: Viewport = {
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    locale: "en_KE",
+    locale: "en_US",
     url: site.url,
     siteName: site.name,
     title: `${site.name}: ${site.tagline}`,
@@ -45,8 +46,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light" data-theme-pref="light" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <meta name="theme-color" content="#0B6B3A" />
         <link
           rel="preload"
           href="/fonts/inter-latin-wght-normal.woff2"
@@ -62,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
         />
       </head>
-      <body className="flex min-h-dvh flex-col">
+      <body className="flex min-h-dvh w-full max-w-full flex-col overflow-x-clip">
         <a
           href="#main-content"
           className="bg-primary text-primary-fg sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:px-4 focus:py-2 focus:font-semibold"
@@ -72,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <Header />
 
-        <main id="main-content" className="flex-1">
+        <main id="main-content" className="w-full max-w-full min-w-0 flex-1 overflow-x-clip">
           {children}
         </main>
 
@@ -90,11 +93,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               name: site.name,
               url: site.url,
               email: site.email,
-              address: {
-                "@type": "PostalAddress",
-                addressLocality: "Nairobi",
-                addressCountry: "KE",
-              },
             },
             {
               "@context": "https://schema.org",

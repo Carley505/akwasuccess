@@ -23,10 +23,10 @@ export function Section({
       id={id}
       aria-labelledby={labelledBy}
       className={cn(
-        "section-y",
+        "section-y w-full max-w-full overflow-x-clip",
         tone === "warm" && "bg-surface-2",
         tone === "tint" && "bg-tint",
-        tone === "dark" && "bg-green-900 text-white",
+        tone === "dark" && "on-dark bg-green-900 text-white",
         className,
       )}
     >
@@ -59,9 +59,9 @@ export function SectionHeading({
         align === "center" && "flex-col items-center text-center",
       )}
     >
-      <div className={cn("max-w-2xl", align === "center" && "mx-auto")}>
+      <div className={cn("max-w-2xl min-w-0", align === "center" && "mx-auto")}>
         {eyebrow && (
-          <p className="text-gold-text mb-2 text-sm font-semibold tracking-wide uppercase">{eyebrow}</p>
+          <p className="text-gold-text mb-2 text-xs font-semibold tracking-wide uppercase sm:text-sm">{eyebrow}</p>
         )}
         <Tag
           id={id}
@@ -73,7 +73,7 @@ export function SectionHeading({
         >
           {title}
         </Tag>
-        {intro && <div className="text-muted mt-4 text-lg">{intro}</div>}
+        {intro && <div className="text-muted mt-3 text-base sm:mt-4 sm:text-lg">{intro}</div>}
       </div>
       {action}
     </div>
@@ -92,11 +92,11 @@ export function PageHeader({
   breadcrumbs?: ReactNode;
 }) {
   return (
-    <div className="bg-surface-2 border-line border-b">
-      <div className="container-site py-10 md:py-14">
+    <div className="bg-surface-2 border-line w-full max-w-full overflow-x-clip border-b">
+      <div className="container-site py-8 sm:py-10 md:py-14">
         {breadcrumbs}
-        <h1 className="gold-rule max-w-3xl text-3xl">{title}</h1>
-        {intro && <div className="text-muted mt-4 max-w-2xl text-lg">{intro}</div>}
+        <h1 className="gold-rule max-w-3xl text-2xl sm:text-3xl">{title}</h1>
+        {intro && <div className="text-muted mt-3 max-w-2xl text-base sm:mt-4 sm:text-lg">{intro}</div>}
         {children}
       </div>
     </div>

@@ -1,8 +1,28 @@
 import "server-only";
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 import { getDb, schema as s } from "@/lib/db";
 import { isSampleDataVisible } from "@/content/site";
+import { WOO_SLUG_ALIASES, isWooCommerceConfigured, syncWooProducts } from "@/lib/woocommerce";
 import type { ProductCardData } from "@/components/product/ProductCard";
+
+let initialWooSyncAttempted = false;
+
+async function ensureWooCatalogLoaded() {
+  if (initialWooSyncAttempted || !isWooCommerceConfigured()) return;
+  initialWooSyncAttempted = true;
+  try {
+    const db = await getDb();
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(s.products)
+      .where(isNotNull(s.products.wooId));
+    if ((row?.count ?? 0) === 0) {
+      await syncWooProducts();
+    }
+  } catch {
+    // Offline or test environment: keep local catalog
+  }
+}
 
 export type ShopFilter = {
   category?: string;
@@ -48,8 +68,8 @@ async function attachRatings(products: s.Product[]): Promise<ProductCardData[]> 
       title: p.title,
       subtitle: p.subtitle,
       level: p.level,
-      priceKes: hideSamplePrice ? 0 : p.priceKes,
-      salePriceKes: hideSamplePrice ? null : p.salePriceKes,
+      priceCents: hideSamplePrice ? 0 : p.priceCents,
+      salePriceCents: hideSamplePrice ? null : p.salePriceCents,
       isFree: p.isFree,
       isSample: p.isSample,
       formats: p.formats ?? [],
@@ -61,6 +81,7 @@ async function attachRatings(products: s.Product[]): Promise<ProductCardData[]> 
 }
 
 export async function getFeaturedProducts(limit = 4): Promise<ProductCardData[]> {
+  await ensureWooCatalogLoaded();
   const db = await getDb();
   const rows = await db
     .select()
@@ -81,6 +102,7 @@ export async function queryProducts(filter: ShopFilter = {}): Promise<{
   items: ProductCardData[];
   total: number;
 }> {
+  await ensureWooCatalogLoaded();
   const db = await getDb();
   const conditions = [eq(s.products.status, "published"), sampleVisibilityClause()];
 
@@ -104,13 +126,13 @@ export async function queryProducts(filter: ShopFilter = {}): Promise<{
   if (filter.pricing === "free") {
     conditions.push(eq(s.products.isFree, true));
   } else if (filter.pricing === "paid") {
-    conditions.push(and(eq(s.products.isFree, false), gte(s.products.priceKes, 1)));
+    conditions.push(and(eq(s.products.isFree, false), gte(s.products.priceCents, 1)));
   }
   if (typeof filter.minPrice === "number" && filter.minPrice > 0) {
-    conditions.push(gte(s.products.priceKes, filter.minPrice));
+    conditions.push(gte(s.products.priceCents, filter.minPrice));
   }
   if (typeof filter.maxPrice === "number" && filter.maxPrice > 0) {
-    conditions.push(lte(s.products.priceKes, filter.maxPrice));
+    conditions.push(lte(s.products.priceCents, filter.maxPrice));
   }
   if (filter.q && filter.q.trim()) {
     const q = `%${filter.q.trim()}%`;
@@ -134,9 +156,9 @@ export async function queryProducts(filter: ShopFilter = {}): Promise<{
     filter.sort === "newest"
       ? [desc(s.products.createdAt)]
       : filter.sort === "price-asc"
-        ? [asc(s.products.priceKes), desc(s.products.popularity)]
+        ? [asc(s.products.priceCents), desc(s.products.popularity)]
         : filter.sort === "price-desc"
-          ? [desc(s.products.priceKes), desc(s.products.popularity)]
+          ? [desc(s.products.priceCents), desc(s.products.popularity)]
           : [desc(s.products.popularity), desc(s.products.createdAt)];
 
   const rows = await db
@@ -154,11 +176,16 @@ export async function queryProducts(filter: ShopFilter = {}): Promise<{
 }
 
 export async function getProductBySlug(slug: string) {
+  await ensureWooCatalogLoaded();
   const db = await getDb();
+  const cleanSlug = slug.trim().toLowerCase();
+  const aliasSlug = WOO_SLUG_ALIASES[cleanSlug];
+  const candidateSlugs = aliasSlug ? [cleanSlug, aliasSlug] : [cleanSlug];
+
   const [product] = await db
     .select()
     .from(s.products)
-    .where(and(eq(s.products.slug, slug), eq(s.products.status, "published")));
+    .where(and(inArray(s.products.slug, candidateSlugs), eq(s.products.status, "published")));
 
   if (!product) return null;
   if (product.isSample && product.type === "bundle" && !isSampleDataVisible) return null;
@@ -208,6 +235,7 @@ export async function getProductBySlug(slug: string) {
 }
 
 export async function getCoursesWithCurriculum() {
+  await ensureWooCatalogLoaded();
   const db = await getDb();
   const rows = await db
     .select()
@@ -256,11 +284,16 @@ export async function getCoursesWithCurriculum() {
 }
 
 export async function getCourseBySlug(slug: string) {
+  await ensureWooCatalogLoaded();
   const db = await getDb();
+  const cleanSlug = slug.trim().toLowerCase();
+  const aliasSlug = WOO_SLUG_ALIASES[cleanSlug];
+  const candidateSlugs = aliasSlug ? [cleanSlug, aliasSlug] : [cleanSlug];
+
   const [product] = await db
     .select()
     .from(s.products)
-    .where(and(eq(s.products.slug, slug), eq(s.products.status, "published")));
+    .where(and(inArray(s.products.slug, candidateSlugs), eq(s.products.status, "published")));
   if (!product) return null;
 
   const [course] = await db

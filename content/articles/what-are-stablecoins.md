@@ -27,6 +27,6 @@ The most common model is **fiat-backed reserves**: an issuing company holds cash
 
 Even though the price aims to stay steady in USD terms, stablecoins are not risk-free:
 
-- Exchange rates between KES and USD still move up and down.
+- Exchange rates between your local currency and USD still move up and down.
 - Sending tokens on the wrong blockchain network can result in lost funds.
 - Issuers and platforms have their own operational and regulatory risks.

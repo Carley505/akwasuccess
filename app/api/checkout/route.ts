@@ -3,22 +3,23 @@ import { NextResponse, type NextRequest } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema as s } from "@/lib/db";
-import { findOrCreateUser, setSessionCookie } from "@/lib/auth";
+import { findOrCreateUser, getSessionUser } from "@/lib/auth";
 import { applyCoupon, computeTotals, effectivePrice, isPurchasable } from "@/lib/pricing";
-import { normalizeKenyanPhone } from "@/lib/phone";
+import { initiateCardPayment, settleOrderPayment } from "@/lib/payments";
 import {
-  initiateCardPayment,
-  initiateMpesaStkPush,
-  settleOrderPayment,
-} from "@/lib/payments";
+  classifyWooProduct,
+  createWooOrder,
+  fetchLiveWooProductsByIds,
+  findOrCreateWooCustomer,
+  formatPaystackWooReference,
+  validateWooCoupon,
+} from "@/lib/woocommerce";
 import { checkRateLimit, clientIp } from "@/lib/security";
 import { isSampleDataVisible } from "@/content/site";
 
 const checkoutSchema = z.object({
   email: z.string().email("Please enter a valid email address for your receipt and download link."),
-  phone: z.string().max(40).optional().nullable(),
   name: z.string().max(120).optional().nullable(),
-  method: z.enum(["mpesa", "card"]),
   productIds: z.array(z.string().uuid()).min(1, "Your cart is empty."),
   couponCode: z.string().max(40).optional().nullable(),
   marketingConsent: z.boolean().optional().default(false),
@@ -47,24 +48,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { email, phone, name, method, productIds, couponCode, marketingConsent } = parsed.data;
-
-  // Validate M-Pesa phone number when M-Pesa is chosen
-  let normalizedPhone: string | null = null;
-  if (method === "mpesa") {
-    normalizedPhone = normalizeKenyanPhone(phone ?? "");
-    if (!normalizedPhone) {
-      return NextResponse.json(
-        {
-          error:
-            "Please enter a valid Kenyan M-Pesa number (e.g. 0712 345 678, 0110 123 456, or 254712345678).",
-        },
-        { status: 400 },
-      );
-    }
-  } else if (phone) {
-    normalizedPhone = normalizeKenyanPhone(phone) ?? phone.trim();
-  }
+  const { email, name, productIds, couponCode, marketingConsent } = parsed.data;
 
   const db = await getDb();
   const dbProducts = await db
@@ -76,67 +60,129 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No valid products found in cart." }, { status: 400 });
   }
 
+  // Re-verify live prices directly from WooCommerce when products have wooId
+  const wooIds = dbProducts
+    .map((p) => p.wooId)
+    .filter((id): id is number => typeof id === "number" && id > 0);
+  const liveWooMap = await fetchLiveWooProductsByIds(wooIds);
+
   // Server-side authoritative pricing (NEVER trust client prices)
-  const pricedItems: { product: s.Product; unitPriceKes: number }[] = [];
+  const pricedItems: { product: s.Product; unitPriceCents: number }[] = [];
   for (const p of dbProducts) {
+    let priceCents = p.priceCents;
+    let salePriceCents = p.salePriceCents;
+
+    if (p.wooId && liveWooMap.has(p.wooId)) {
+      const liveClassified = classifyWooProduct(liveWooMap.get(p.wooId)!);
+      priceCents = liveClassified.priceCents;
+      salePriceCents = liveClassified.salePriceCents;
+      if (priceCents !== p.priceCents || salePriceCents !== p.salePriceCents) {
+        await db
+          .update(s.products)
+          .set({ priceCents, salePriceCents, wooSyncedAt: new Date() })
+          .where(eq(s.products.id, p.id));
+      }
+    }
+
     const cleanP =
       p.isSample && !isSampleDataVisible
-        ? { ...p, priceKes: 0, salePriceKes: null }
-        : p;
+        ? { ...p, priceCents: 0, salePriceCents: null }
+        : { ...p, priceCents, salePriceCents };
+
     if (!isPurchasable(cleanP)) {
       return NextResponse.json(
         { error: `"${p.title}" is not yet open for purchase.` },
         { status: 400 },
       );
     }
-    pricedItems.push({ product: p, unitPriceKes: effectivePrice(cleanP) });
+    pricedItems.push({ product: p, unitPriceCents: effectivePrice(cleanP) });
   }
 
-  const rawPrices = pricedItems.map((i) => i.unitPriceKes);
+  const rawPrices = pricedItems.map((i) => i.unitPriceCents);
   const rawSubtotal = rawPrices.reduce((a, b) => a + b, 0);
 
-  let discountKes = 0;
+  let discountCents = 0;
   let validCouponCode: string | null = null;
 
   if (couponCode && couponCode.trim()) {
     const code = couponCode.toUpperCase().trim();
-    const [coupon] = await db.select().from(s.coupons).where(eq(s.coupons.code, code));
-    const check = applyCoupon(coupon, rawSubtotal);
-    if (!check.ok) {
-      return NextResponse.json({ error: check.reason }, { status: 400 });
+    const wooCoupon = await validateWooCoupon(code, rawSubtotal);
+    if (wooCoupon.found) {
+      if (!wooCoupon.ok) {
+        return NextResponse.json({ error: wooCoupon.reason }, { status: 400 });
+      }
+      discountCents = wooCoupon.discountCents;
+      validCouponCode = wooCoupon.code;
+    } else {
+      const [coupon] = await db.select().from(s.coupons).where(eq(s.coupons.code, code));
+      const check = applyCoupon(coupon, rawSubtotal);
+      if (!check.ok) {
+        return NextResponse.json({ error: check.reason }, { status: 400 });
+      }
+      discountCents = check.discountCents;
+      validCouponCode = code;
     }
-    discountKes = check.discountKes;
-    validCouponCode = code;
   }
 
-  const totals = computeTotals(rawPrices, discountKes);
+  const totals = computeTotals(rawPrices, discountCents);
 
-  // Create or update guest user account automatically from email (Spec 8.4)
+  // Check if customer is signed in or checking out as a guest
+  const sessionUser = await getSessionUser();
   const user = await findOrCreateUser({
     email,
     name: name ?? undefined,
-    phone: normalizedPhone ?? undefined,
     marketingConsent,
   });
 
-  // Set session cookie so the customer can immediately view their order & library
-  await setSessionCookie({ userId: user.id, email: user.email, role: user.role });
+  // If signed in, ensure WooCommerce customer ID is linked so their Woo account tracks the order
+  let wooCustomerId = user.wooCustomerId ?? null;
+  if (sessionUser && !wooCustomerId) {
+    wooCustomerId = await findOrCreateWooCustomer({
+      email: user.email,
+      name: name ?? user.name,
+    });
+    if (wooCustomerId) {
+      await db
+        .update(s.users)
+        .set({ wooCustomerId, updatedAt: new Date() })
+        .where(eq(s.users.id, user.id));
+    }
+  }
 
   const orderNumber = generateOrderNumber();
+
+  // Create authoritative order in WooCommerce when cart contains WooCommerce products
+  const wooLineItems = pricedItems
+    .filter((i) => typeof i.product.wooId === "number" && i.product.wooId > 0)
+    .map((i) => ({ wooId: i.product.wooId!, quantity: 1 }));
+
+  const wooOrder =
+    wooLineItems.length > 0
+      ? await createWooOrder({
+          email: user.email,
+          name: name ?? user.name,
+          wooCustomerId: sessionUser ? wooCustomerId : null,
+          items: wooLineItems,
+          couponCode: validCouponCode,
+          orderNumber,
+        })
+      : null;
+
   const [order] = await db
     .insert(s.orders)
     .values({
       number: orderNumber,
       userId: user.id,
       email: user.email,
-      phone: normalizedPhone,
       name: name ? name.trim() : null,
       status: "pending",
-      subtotalKes: totals.subtotalKes,
-      discountKes: totals.discountKes,
-      totalKes: totals.totalKes,
+      subtotalCents: totals.subtotalCents,
+      discountCents: totals.discountCents,
+      totalCents: totals.totalCents,
       couponCode: validCouponCode,
       marketingConsent,
+      wooOrderId: wooOrder?.wooOrderId ?? null,
+      wooOrderKey: wooOrder?.wooOrderKey ?? null,
     })
     .returning();
 
@@ -145,7 +191,7 @@ export async function POST(req: NextRequest) {
       orderId: order!.id,
       productId: item.product.id,
       title: item.product.title,
-      unitPriceKes: item.unitPriceKes,
+      unitPriceCents: item.unitPriceCents,
     });
   }
 
@@ -159,10 +205,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const reference = `AKWA_${order!.number}_${Date.now()}`;
+  const reference =
+    wooOrder?.reference ?? formatPaystackWooReference(wooOrder?.wooOrderId, order!.number);
 
   // Free order (total == 0) settles immediately
-  if (totals.totalKes === 0) {
+  if (totals.totalCents === 0) {
     const [freePayment] = await db
       .insert(s.payments)
       .values({
@@ -170,7 +217,7 @@ export async function POST(req: NextRequest) {
         provider: "mock",
         method: "free",
         status: "pending",
-        amountKes: 0,
+        amountCents: 0,
         reference,
         providerRef: reference,
       })
@@ -192,50 +239,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (method === "mpesa") {
-    const stk = await initiateMpesaStkPush({
-      reference,
-      phoneNormalized: normalizedPhone!,
-      amountKes: totals.totalKes,
-      orderNumber: order!.number,
-    });
-
-    const [payment] = await db
-      .insert(s.payments)
-      .values({
-        orderId: order!.id,
-        provider: stk.provider,
-        method: "mpesa",
-        status: stk.ok ? "pending" : "failed",
-        amountKes: totals.totalKes,
-        reference,
-        providerRef: stk.providerRef || reference,
-        phone: normalizedPhone,
-        failureReason: stk.ok ? null : stk.message,
-      })
-      .returning();
-
-    if (!stk.ok) {
-      return NextResponse.json({ error: stk.message, paymentId: payment!.id }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      orderId: order!.id,
-      orderNumber: order!.number,
-      paymentId: payment!.id,
-      provider: stk.provider,
-      method: "mpesa",
-      status: "pending",
-      message: stk.message,
-    });
-  }
-
-  // Card payment via Paystack (or Sandbox)
+  // Card payment in USD via Paystack inline popup (Option A) or local sandbox
   const card = await initiateCardPayment({
     reference,
     email: user.email,
-    amountKes: totals.totalKes,
+    amountCents: totals.totalCents,
     orderId: order!.id,
+    wooOrderId: wooOrder?.wooOrderId,
   });
 
   const [payment] = await db
@@ -245,7 +255,7 @@ export async function POST(req: NextRequest) {
       provider: card.provider,
       method: "card",
       status: card.ok ? "pending" : "failed",
-      amountKes: totals.totalKes,
+      amountCents: totals.totalCents,
       reference,
       providerRef: reference,
     })
@@ -253,7 +263,10 @@ export async function POST(req: NextRequest) {
 
   if (!card.ok) {
     return NextResponse.json(
-      { error: "Could not start card checkout. Please try M-Pesa or retry.", paymentId: payment!.id },
+      {
+        error: "Could not start card checkout. Please try again in a moment.",
+        paymentId: payment!.id,
+      },
       { status: 400 },
     );
   }
@@ -265,6 +278,11 @@ export async function POST(req: NextRequest) {
     provider: card.provider,
     method: "card",
     status: "pending",
+    reference,
+    amountCents: totals.totalCents,
+    email: user.email,
+    accessCode: card.accessCode,
+    publicKey: card.publicKey,
     authorizationUrl: card.authorizationUrl,
   });
 }

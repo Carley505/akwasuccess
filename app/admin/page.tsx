@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   const user = await getSessionUser();
-  const adminEmail = process.env.ADMIN_EMAIL ?? "owner@akwasuccess.com";
+  const adminEmail = process.env.ADMIN_EMAIL ?? "callistusngeywa001@gmail.com";
 
   if (!user || user.role !== "admin") {
     return (
@@ -25,7 +25,7 @@ export default async function AdminPage() {
         />
         <Section>
           <div className="mx-auto max-w-md">
-            <MagicLinkLoginForm redirectTo="/admin" />
+            <MagicLinkLoginForm redirectTo="/admin" defaultEmail={adminEmail} />
           </div>
         </Section>
       </>
@@ -49,20 +49,20 @@ export default async function AdminPage() {
 
   const paidOrders = allOrders.filter((o) => o.status === "paid");
   const pendingOrders = allOrders.filter((o) => o.status === "pending");
-  const revenueKes = paidOrders.reduce((sum, o) => sum + o.totalKes, 0);
+  const revenueCents = paidOrders.reduce((sum, o) => sum + o.totalCents, 0);
 
   return (
     <>
       <PageHeader
         title="Owner Admin & CMS"
-        intro="Add or edit products, update KES prices, publish articles, moderate reviews, and manage orders without code."
+        intro="Add or edit products, upload cover images and PDF/EPUB files, update USD prices, publish articles, moderate reviews, and manage orders without code."
         breadcrumbs={<Breadcrumbs items={[{ name: "Admin" }]} />}
       />
 
       <Section>
         <AdminClient
           stats={{
-            revenueKes,
+            revenueCents,
             paidOrders: paidOrders.length,
             pendingOrders: pendingOrders.length,
             subscribersCount: subCount?.count ?? 0,
@@ -72,18 +72,27 @@ export default async function AdminPage() {
             slug: p.slug,
             title: p.title,
             subtitle: p.subtitle,
+            description: p.description,
             type: p.type,
             categorySlug: p.categorySlug,
             level: p.level,
-            priceKes: p.priceKes,
+            priceCents: p.priceCents,
+            salePriceCents: p.salePriceCents,
+            pages: p.pages,
+            featured: p.featured,
+            isSample: p.isSample,
+            coverUrl: p.cover?.url ?? null,
+            outcomes: p.outcomes ?? [],
+            toc: (p.toc ?? []).map((t) => t.title),
             status: p.status,
+            wooId: p.wooId ?? null,
           }))}
           orders={allOrders.map((o) => ({
             id: o.id,
             number: o.number,
             email: o.email,
             status: o.status,
-            totalKes: o.totalKes,
+            totalCents: o.totalCents,
             createdAt: o.createdAt.toISOString(),
           }))}
           reviews={allReviews.map((r) => ({
@@ -100,9 +109,12 @@ export default async function AdminPage() {
             status: t.status,
           }))}
           envStatus={{
-            mpesaConfigured: Boolean(process.env.MPESA_CONSUMER_KEY),
             paystackConfigured: Boolean(process.env.PAYSTACK_SECRET_KEY),
             emailConfigured: Boolean(process.env.EMAIL_API_KEY),
+            woocommerceConfigured: Boolean(
+              process.env.WOOCOMMERCE_CONSUMER_KEY && process.env.WOOCOMMERCE_CONSUMER_SECRET,
+            ),
+            woocommerceUrl: process.env.WOOCOMMERCE_URL || "https://cms.akwasuccess.com",
           }}
         />
       </Section>

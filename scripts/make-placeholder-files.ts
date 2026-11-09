@@ -147,7 +147,7 @@ async function main() {
         "[ ] Never screenshot your recovery phrase or store it in cloud notes or email.",
         "[ ] Enable app-based two-factor authentication (2FA) on any exchange account.",
         "[ ] Double-check the network and address before sending any transfer.",
-        "[ ] On P2P, confirm funds in your actual M-Pesa or bank app—never trust an SMS screenshot alone.",
+        "[ ] On P2P, confirm funds in your actual bank or payment app—never trust an SMS or screenshot alone.",
         "[ ] Ignore anyone promising guaranteed returns or asking you to send crypto to 'unlock' profits.",
       ],
       disclaimer: cryptoDisclaimer,

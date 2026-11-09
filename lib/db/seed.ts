@@ -17,32 +17,72 @@ import * as s from "./schema";
 type SeedOptions = { sample: boolean };
 
 function shouldUseSample() {
-  if (process.env.NODE_ENV === "production" && process.env.SHOW_SAMPLE_DATA !== "true") {
-    return false;
-  }
-  return process.env.SEED_SAMPLE_DATA !== "false";
+  return process.env.SHOW_SAMPLE_DATA !== "false" && process.env.SEED_SAMPLE_DATA !== "false";
 }
 
 export async function seedIfEmpty(db: Database) {
-  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(s.categories);
-  if ((row?.n ?? 0) > 0) return;
+  const [row] = await db
+    .select({
+      n: sql<number>`count(*)::int`,
+      wooCount: sql<number>`count(*) filter (where ${s.products.wooId} is not null)::int`,
+      missingCovers: sql<number>`count(*) filter (where (${s.products.cover} is null or ${s.products.cover}->>'url' like '%.png' or ${s.products.cover}->>'url' like '/api/uploads/%') and ${s.products.type} <> 'service')::int`,
+    })
+    .from(s.products);
+  if ((row?.wooCount ?? 0) > 0) return;
+  if ((row?.n ?? 0) >= seedProducts.length && (row?.missingCovers ?? 0) === 0) return;
   await seed(db, { sample: shouldUseSample() });
+}
+
+function findUploadedCoverForSlug(slug: string, title: string): s.ImageRef | null {
+  try {
+    const coversDir = path.join(process.cwd(), "public", "uploads", "covers");
+    if (!fs.existsSync(coversDir)) return null;
+    const prefix = `${slug}-`;
+    const matches = fs
+      .readdirSync(coversDir)
+      .filter((f) => f.startsWith(prefix) && /\.(webp|png|jpe?g|gif|svg)$/i.test(f))
+      .sort()
+      .reverse();
+    if (matches.length === 0) return null;
+    return {
+      url: `/uploads/covers/${matches[0]}`,
+      alt: `${title} cover`,
+      width: 960,
+      height: 1440,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function upsertProduct(db: Database, p: SeedProduct) {
   const { files, ...data } = p;
+  const uploadedCover = findUploadedCoverForSlug(data.slug, data.title);
+  const resolvedCover = uploadedCover ?? data.cover ?? null;
   const [existing] = await db
-    .select({ id: s.products.id })
+    .select({ id: s.products.id, cover: s.products.cover })
     .from(s.products)
     .where(eq(s.products.slug, data.slug));
   let id = existing?.id;
   if (id) {
+    const existingUrl = existing?.cover?.url ?? "";
+    const keepExistingCover =
+      existing?.cover &&
+      !existingUrl.endsWith(".png") &&
+      !existingUrl.startsWith("/api/uploads/covers/");
     await db
       .update(s.products)
-      .set({ ...data, updatedAt: new Date() })
+      .set({
+        ...data,
+        cover: keepExistingCover ? existing.cover : resolvedCover,
+        updatedAt: new Date(),
+      })
       .where(eq(s.products.id, id));
   } else {
-    const [inserted] = await db.insert(s.products).values(data).returning({ id: s.products.id });
+    const [inserted] = await db
+      .insert(s.products)
+      .values({ ...data, cover: resolvedCover })
+      .returning({ id: s.products.id });
     id = inserted!.id;
     for (const f of files ?? []) {
       await db.insert(s.productFiles).values({ productId: id, ...f });
@@ -120,12 +160,18 @@ export async function seed(db: Database, opts: SeedOptions = { sample: false }) 
 
   await seedArticles(db);
 
-  // Admin user (owner) from env.
-  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
-  if (adminEmail) {
+  // Admin users (owner) from env + default owner emails.
+  const adminEmails = Array.from(
+    new Set(
+      ["callistusngeywa001@gmail.com", "owner@akwasuccess.com", ...(process.env.ADMIN_EMAIL ?? "").split(",")]
+        .map((e) => e.toLowerCase().trim())
+        .filter(Boolean),
+    ),
+  );
+  for (const email of adminEmails) {
     await db
       .insert(s.users)
-      .values({ email: adminEmail, role: "admin", name: "Owner" })
+      .values({ email, role: "admin", name: "Owner" })
       .onConflictDoUpdate({ target: s.users.email, set: { role: "admin" } });
   }
 }

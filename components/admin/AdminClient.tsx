@@ -1,23 +1,33 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Field, FormAlert, Input, Select, Textarea } from "@/components/ui/Form";
 import { Tabs } from "@/components/ui/Tabs";
 import { Badge } from "@/components/ui/Badge";
-import { formatDate, formatKes } from "@/lib/utils";
+import { centsToDollars, formatDate, formatMoney } from "@/lib/utils";
 
 type AdminProduct = {
   id: string;
   slug: string;
   title: string;
   subtitle: string;
+  description: string;
   type: string;
   categorySlug: string;
   level: string;
-  priceKes: number;
+  priceCents: number;
+  salePriceCents: number | null;
+  pages: number | null;
+  featured: boolean;
+  isSample: boolean;
+  coverUrl: string | null;
+  outcomes: string[];
+  toc: string[];
   status: string;
+  wooId?: number | null;
 };
 
 type AdminOrder = {
@@ -25,7 +35,7 @@ type AdminOrder = {
   number: string;
   email: string;
   status: string;
-  totalKes: number;
+  totalCents: number;
   createdAt: string;
 };
 
@@ -53,7 +63,7 @@ export function AdminClient({
   envStatus,
 }: {
   stats: {
-    revenueKes: number;
+    revenueCents: number;
     paidOrders: number;
     pendingOrders: number;
     subscribersCount: number;
@@ -62,11 +72,18 @@ export function AdminClient({
   orders: AdminOrder[];
   reviews: AdminReview[];
   testimonials: AdminTestimonial[];
-  envStatus: { mpesaConfigured: boolean; paystackConfigured: boolean; emailConfigured: boolean };
+  envStatus: {
+    paystackConfigured: boolean;
+    emailConfigured: boolean;
+    woocommerceConfigured?: boolean;
+    woocommerceUrl?: string;
+  };
 }) {
   const router = useRouter();
   const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<AdminProduct | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   async function callAdmin(payload: Record<string, unknown>) {
     setBusy(true);
@@ -91,24 +108,41 @@ export function AdminClient({
     }
   }
 
-  function onProductSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onProductSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    callAdmin({
-      action: "upsert-product",
-      slug: fd.get("slug"),
-      title: fd.get("title"),
-      subtitle: fd.get("subtitle"),
-      description: fd.get("description"),
-      type: fd.get("type"),
-      categorySlug: fd.get("categorySlug"),
-      level: fd.get("level"),
-      priceKes: fd.get("priceKes"),
-      salePriceKes: fd.get("salePriceKes"),
-      pages: fd.get("pages"),
-      outcomesText: fd.get("outcomesText"),
-      status: fd.get("status"),
-    });
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    fd.set("action", "upsert-product");
+
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/actions", {
+        method: "POST",
+        body: fd,
+      });
+      const data = (await res.json()) as { message?: string; error?: string };
+      if (!res.ok) {
+        setMsg({ tone: "error", text: data.error ?? "Could not save product." });
+      } else {
+        setMsg({ tone: "success", text: data.message ?? "Product saved." });
+        router.refresh();
+      }
+    } catch {
+      setMsg({ tone: "error", text: "Network error while saving product." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function selectForEdit(p: AdminProduct) {
+    setEditing(p);
+    setFormKey((k) => k + 1);
+  }
+
+  function clearProductForm() {
+    setEditing(null);
+    setFormKey((k) => k + 1);
   }
 
   function onArticleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -132,7 +166,7 @@ export function AdminClient({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card p-5">
           <p className="text-muted text-xs font-bold uppercase">Total revenue</p>
-          <p className="mt-1 font-serif text-2xl font-bold">{formatKes(stats.revenueKes)}</p>
+          <p className="mt-1 font-serif text-2xl font-bold">{formatMoney(stats.revenueCents)}</p>
         </div>
         <div className="card p-5">
           <p className="text-muted text-xs font-bold uppercase">Paid orders</p>
@@ -157,49 +191,142 @@ export function AdminClient({
             id: "products",
             label: `Products (${products.length})`,
             content: (
-              <div className="grid gap-8 lg:grid-cols-12">
+              <div className="grid items-start gap-8 lg:grid-cols-12">
                 <div className="space-y-3 lg:col-span-7">
-                  <h2 className="text-xl font-bold">Existing products</h2>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-bold">Store catalog ({products.length})</h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {envStatus.woocommerceConfigured && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          loading={busy}
+                          onClick={() => callAdmin({ action: "sync-woocommerce" })}
+                        >
+                          Sync from WooCommerce now
+                        </Button>
+                      )}
+                      <Button size="sm" variant="secondary" onClick={clearProductForm}>
+                        + New product
+                      </Button>
+                    </div>
+                  </div>
                   <ul className="space-y-2.5 text-sm">
                     {products.map((p) => (
                       <li
                         key={p.id}
-                        className="card flex flex-wrap items-center justify-between gap-2 p-4"
+                        className="card flex flex-wrap items-center justify-between gap-3 p-4"
                       >
-                        <div>
-                          <p className="font-bold">{p.title}</p>
-                          <p className="text-muted text-xs">
-                            Slug: <code>{p.slug}</code> • {p.type} • {p.categorySlug}
-                          </p>
+                        <div className="flex min-w-0 items-center gap-3">
+                          {p.coverUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={
+                                p.coverUrl.startsWith("/uploads/")
+                                  ? `/api${p.coverUrl}`
+                                  : p.coverUrl
+                              }
+                              alt={`${p.title} cover`}
+                              className="border-line h-14 w-9 shrink-0 rounded border object-cover"
+                            />
+                          )}
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold">{p.title}</p>
+                              <Badge tone="green">{p.categorySlug}</Badge>
+                              <Badge>{p.type}</Badge>
+                              {p.wooId && <Badge tone="outline-gold">WC #{p.wooId}</Badge>}
+                              {p.isSample && <Badge tone="gold">Mockup</Badge>}
+                            </div>
+                            <p className="text-muted break-all text-xs">
+                              Slug: <code>{p.slug}</code> • {p.status}
+                            </p>
+                          </div>
                         </div>
-                        <span className="font-bold">{formatKes(p.priceKes)}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold">{formatMoney(p.priceCents)}</span>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => selectForEdit(p)}
+                          >
+                            Edit
+                          </Button>
+                          <Link
+                            href={`/shop/${p.slug}`}
+                            className="text-link px-2 text-xs font-semibold no-underline hover:underline"
+                          >
+                            View
+                          </Link>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              callAdmin({ action: "delete-product", productId: p.id })
+                            }
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 </div>
 
                 <form
+                  key={formKey}
                   onSubmit={onProductSubmit}
-                  className="card space-y-4 p-6 lg:col-span-5"
+                  className="card min-w-0 space-y-4 p-4 sm:p-6 lg:col-span-5"
                 >
-                  <h3 className="text-lg font-bold">Add or update product (by slug)</h3>
-                  <Field id="adm-p-slug" label="Slug">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-lg font-bold">
+                      {editing ? `Edit: ${editing.title}` : "Add or update product"}
+                    </h3>
+                    {editing && (
+                      <button
+                        type="button"
+                        onClick={clearProductForm}
+                        className="text-link text-xs font-semibold underline"
+                      >
+                        Clear form
+                      </button>
+                    )}
+                  </div>
+
+                  <Field id="adm-p-slug" label="URL Slug">
                     <Input
                       id="adm-p-slug"
                       name="slug"
                       required
-                      placeholder="cryptocurrency-for-beginners"
+                      defaultValue={editing?.slug ?? ""}
+                      placeholder="e.g. solar-inverter-installation-guide"
                     />
                   </Field>
                   <Field id="adm-p-title" label="Title">
-                    <Input id="adm-p-title" name="title" required />
+                    <Input
+                      id="adm-p-title"
+                      name="title"
+                      required
+                      defaultValue={editing?.title ?? ""}
+                      placeholder="e.g. Practical Solar & Inverter Installation Guide"
+                    />
                   </Field>
                   <Field id="adm-p-sub" label="Subtitle" optional>
-                    <Input id="adm-p-sub" name="subtitle" />
+                    <Input
+                      id="adm-p-sub"
+                      name="subtitle"
+                      defaultValue={editing?.subtitle ?? ""}
+                      placeholder="Short one-sentence summary shown on cards"
+                    />
                   </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field id="adm-p-type" label="Type">
-                      <Select id="adm-p-type" name="type" defaultValue="ebook">
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Field id="adm-p-type" label="Format / Type">
+                      <Select
+                        id="adm-p-type"
+                        name="type"
+                        defaultValue={editing?.type ?? "ebook"}
+                      >
                         <option value="ebook">eBook</option>
                         <option value="course">Course</option>
                         <option value="tutorial">Tutorial</option>
@@ -208,49 +335,164 @@ export function AdminClient({
                       </Select>
                     </Field>
                     <Field id="adm-p-cat" label="Category">
-                      <Select id="adm-p-cat" name="categorySlug" defaultValue="crypto">
+                      <Select
+                        id="adm-p-cat"
+                        name="categorySlug"
+                        defaultValue={editing?.categorySlug ?? "crypto"}
+                      >
                         <option value="crypto">Crypto</option>
                         <option value="finance">Finance</option>
                         <option value="technical">Technical</option>
                         <option value="psychology">Psychology</option>
+                        <option value="marketing">Marketing</option>
                         <option value="services">Services</option>
                       </Select>
                     </Field>
+                    <Field id="adm-p-level" label="Level">
+                      <Select
+                        id="adm-p-level"
+                        name="level"
+                        defaultValue={editing?.level ?? "beginner"}
+                      >
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                      </Select>
+                    </Field>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Field id="adm-p-price" label="Price (KES)">
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Field id="adm-p-price" label="Price (USD)">
                       <Input
                         id="adm-p-price"
-                        name="priceKes"
+                        name="priceUsd"
                         type="number"
-                        defaultValue="1000"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        defaultValue={
+                          editing ? centsToDollars(editing.priceCents) : "12.00"
+                        }
                       />
                     </Field>
-                    <Field id="adm-p-sale" label="Sale (KES)" optional>
-                      <Input id="adm-p-sale" name="salePriceKes" type="number" />
+                    <Field id="adm-p-sale" label="Sale (USD)" optional>
+                      <Input
+                        id="adm-p-sale"
+                        name="salePriceUsd"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        defaultValue={
+                          editing?.salePriceCents
+                            ? centsToDollars(editing.salePriceCents)
+                            : ""
+                        }
+                      />
                     </Field>
                     <Field id="adm-p-pages" label="Pages" optional>
-                      <Input id="adm-p-pages" name="pages" type="number" />
+                      <Input
+                        id="adm-p-pages"
+                        name="pages"
+                        type="number"
+                        defaultValue={editing?.pages ?? ""}
+                      />
                     </Field>
                   </div>
+
                   <Field id="adm-p-desc" label="Description">
-                    <Textarea id="adm-p-desc" name="description" />
+                    <Textarea
+                      id="adm-p-desc"
+                      name="description"
+                      defaultValue={editing?.description ?? ""}
+                    />
                   </Field>
+
                   <Field
                     id="adm-p-outcomes"
-                    label="What you will learn (one outcome per line)"
+                    label="What you will learn (one bullet per line)"
                     optional
                   >
-                    <Textarea id="adm-p-outcomes" name="outcomesText" />
+                    <Textarea
+                      id="adm-p-outcomes"
+                      name="outcomesText"
+                      defaultValue={editing?.outcomes.join("\n") ?? ""}
+                    />
                   </Field>
-                  <Field id="adm-p-status" label="Status">
-                    <Select id="adm-p-status" name="status" defaultValue="published">
-                      <option value="published">Published</option>
-                      <option value="draft">Draft</option>
-                    </Select>
+
+                  <Field
+                    id="adm-p-toc"
+                    label="Table of contents (one chapter/part title per line)"
+                    optional
+                  >
+                    <Textarea
+                      id="adm-p-toc"
+                      name="tocText"
+                      defaultValue={editing?.toc.join("\n") ?? ""}
+                    />
                   </Field>
-                  <Button type="submit" loading={busy}>
-                    Save product
+
+                  <div className="border-line space-y-3 rounded-lg border p-3.5">
+                    <p className="text-xs font-bold tracking-wider uppercase">
+                      File &amp; Cover Uploads (optional)
+                    </p>
+                    <Field
+                      id="adm-p-cover"
+                      label="Cover image (2:3 ratio, JPG/PNG/WebP)"
+                      optional
+                    >
+                      <Input id="adm-p-cover" name="coverFile" type="file" accept="image/*" />
+                    </Field>
+                    <Field
+                      id="adm-p-file"
+                      label="Full digital eBook file (PDF or EPUB — delivered to buyers)"
+                      optional
+                    >
+                      <Input
+                        id="adm-p-file"
+                        name="productFile"
+                        type="file"
+                        accept=".pdf,.epub,application/pdf,application/epub+zip"
+                      />
+                    </Field>
+                    <Field
+                      id="adm-p-sample"
+                      label="Free sample chapter (PDF — public preview)"
+                      optional
+                    >
+                      <Input
+                        id="adm-p-sample"
+                        name="sampleFile"
+                        type="file"
+                        accept=".pdf,application/pdf"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-2">
+                    <Field id="adm-p-status" label="Status">
+                      <Select
+                        id="adm-p-status"
+                        name="status"
+                        defaultValue={editing?.status ?? "published"}
+                      >
+                        <option value="published">Published</option>
+                        <option value="draft">Draft</option>
+                      </Select>
+                    </Field>
+                    <label className="mt-1 flex items-center gap-2 text-sm font-medium sm:mt-6">
+                      <input
+                        type="checkbox"
+                        name="featured"
+                        defaultChecked={editing?.featured ?? false}
+                        className="size-4 rounded"
+                      />
+                      <span>Feature on Home page</span>
+                    </label>
+                  </div>
+
+                  <Button type="submit" loading={busy} block>
+                    {editing ? "Update product" : "Create product"}
                   </Button>
                 </form>
               </div>
@@ -284,11 +526,12 @@ export function AdminClient({
                             #{o.number} — {o.email}
                           </p>
                           <p className="text-muted text-xs">
-                            {formatDate(o.createdAt)} • <span className="capitalize">{o.status}</span>
+                            {formatDate(o.createdAt)} •{" "}
+                            <span className="capitalize">{o.status}</span>
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold">{formatKes(o.totalKes)}</span>
+                          <span className="font-bold">{formatMoney(o.totalCents)}</span>
                           {o.status === "paid" && (
                             <Button
                               size="sm"
@@ -494,12 +737,19 @@ export function AdminClient({
                   >
                     <h3 className="text-lg font-bold">Create coupon</h3>
                     <div className="grid grid-cols-3 gap-2">
-                      <Input name="code" placeholder="KENYA15" required />
+                      <Input name="code" placeholder="WELCOME15" required />
                       <Select name="type" defaultValue="percent">
                         <option value="percent">% off</option>
-                        <option value="fixed">KES off</option>
+                        <option value="fixed">USD off</option>
                       </Select>
-                      <Input name="value" type="number" defaultValue="15" required />
+                      <Input
+                        name="value"
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        defaultValue="15"
+                        required
+                      />
                     </div>
                     <Button type="submit" size="sm">
                       Save coupon
@@ -524,13 +774,7 @@ export function AdminClient({
                   <div className="card space-y-2 p-5 text-sm">
                     <h3 className="text-lg font-bold">Integration keys status</h3>
                     <p>
-                      M-Pesa Daraja:{" "}
-                      <strong>
-                        {envStatus.mpesaConfigured ? "Live keys set" : "Sandbox Simulator active"}
-                      </strong>
-                    </p>
-                    <p>
-                      Paystack Card:{" "}
+                      Paystack Card (USD):{" "}
                       <strong>
                         {envStatus.paystackConfigured
                           ? "Live keys set"
@@ -554,7 +798,7 @@ export function AdminClient({
                     className="card space-y-3 p-5"
                   >
                     <h3 className="text-lg font-bold">
-                      Kenya Data Protection Act — Customer deletion tool
+                      Privacy requests (GDPR / CCPA) — Customer deletion tool
                     </h3>
                     <Input
                       name="email"

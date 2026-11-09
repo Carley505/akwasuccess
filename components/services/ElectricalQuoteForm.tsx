@@ -4,14 +4,14 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field, FormAlert, Honeypot, Input, Select, Textarea } from "@/components/ui/Form";
-import { whatsappLink } from "@/content/site";
+import { site, whatsappLink } from "@/content/site";
 import { track } from "@/lib/analytics/client";
 
 const MAX_FILES = 3;
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
- * Client-side image compression via Canvas so slow 3G/4G connections in Kenya
+ * Client-side image compression via Canvas so slow mobile connections
  * don't upload multi-megabyte raw camera photos.
  */
 async function compressImage(file: File): Promise<string> {
@@ -141,25 +141,25 @@ export function ElectricalQuoteForm() {
         <Field id="quote-name" label="Your name">
           <Input id="quote-name" name="name" autoComplete="name" required />
         </Field>
-        <Field id="quote-phone" label="Phone / M-Pesa number">
+        <Field id="quote-phone" label="Phone number">
           <Input
             id="quote-phone"
             name="phone"
             type="tel"
-            inputMode="numeric"
+            inputMode="tel"
             autoComplete="tel"
-            placeholder="0712 345 678"
+            placeholder="+1 555 234 5678"
             required
           />
         </Field>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field id="quote-location" label="Location / Estate / Town">
+        <Field id="quote-location" label="City / Location">
           <Input
             id="quote-location"
             name="location"
-            placeholder="e.g. Westlands, Nairobi"
+            placeholder="e.g. Austin, TX / Remote"
             required
           />
         </Field>
@@ -219,7 +219,7 @@ export function ElectricalQuoteForm() {
       {status && (
         <div className="space-y-3">
           <FormAlert tone={status.tone}>{status.message}</FormAlert>
-          {status.waSummary && (
+          {status.waSummary && site.whatsapp && (
             <a
               href={whatsappLink(status.waSummary)}
               target="_blank"

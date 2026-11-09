@@ -1,7 +1,7 @@
 ---
 slug: recovery-phrase-security
 title: How to Protect Your Recovery Phrase and Avoid Scams
-excerpt: Practical rules to keep your 12- or 24-word seed phrase safe and spot the most common crypto scams in East Africa.
+excerpt: Practical rules to keep your 12- or 24-word seed phrase safe and spot the most common crypto scams.
 category: crypto
 level: beginner
 featured: true

@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "How Akwasuccess collects, uses, and protects your personal data under the Kenya Data Protection Act (2019).",
+    "How Akwasuccess collects, uses, and protects your personal data in accordance with international privacy standards.",
   alternates: { canonical: "/privacy-policy" },
 };
 
@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
     <>
       <PageHeader
         title="Privacy Policy"
-        intro="Plain-language explanation of how we handle your data, aligned with the Kenya Data Protection Act (2019)."
+        intro="Plain-language explanation of how we handle your data, aligned with international data protection standards (GDPR & CCPA principles)."
         breadcrumbs={<Breadcrumbs items={[{ name: "Privacy policy" }]} />}
       />
 
@@ -26,16 +26,15 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             {site.name} (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;us&rdquo;) respects your
-            privacy and is committed to protecting your personal data in accordance with the{" "}
-            <strong>Kenya Data Protection Act, 2019</strong>.
+            privacy and is committed to protecting your personal data in accordance with{" "}
+            <strong>international data protection standards (including GDPR and CCPA principles)</strong>.
           </p>
 
           <h2>1. Minimum data we collect</h2>
           <ul>
             <li>
               <strong>When you buy an eBook or course:</strong> your email address (to send your
-              receipt, download link, and account login link), your M-Pesa phone number (when paying
-              with M-Pesa), and your optional name.
+              receipt, download link, and account login link) and your optional name.
             </li>
             <li>
               <strong>Payment card details:</strong> we <strong>never</strong> see or store your
@@ -66,7 +65,7 @@ export default function PrivacyPolicyPage() {
             collect personal identifiers.
           </p>
 
-          <h2>4. Your rights under the Kenya Data Protection Act</h2>
+          <h2>4. Your privacy and data protection rights</h2>
           <p>
             You have the right to request access to the personal data we hold about you, ask us to
             correct inaccurate details, withdraw marketing consent at any time, or request deletion

@@ -7,18 +7,18 @@ export const site = {
   tagline: "Learn, Build, Understand & Grow",
   supportingLine: "Practical knowledge on finance, the digital economy, and technology.",
   description:
-    "eBooks, courses, tutorials and consulting on cryptocurrency, financial education, technical skills and personal wellbeing. Pay with M-Pesa or card.",
+    "eBooks, courses, tutorials and consulting on cryptocurrency, financial education, technical skills and personal wellbeing. Learn from anywhere in the world, pay securely by card in US dollars.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  locale: "en-KE",
-  currency: "KES",
-  /** Fixed KES per 1 USD used for the optional USD display. TODO: owner to confirm. */
-  usdRate: Number(process.env.NEXT_PUBLIC_USD_RATE ?? 129),
-  location: "Nairobi, Kenya",
+  locale: "en",
+  /** All prices are stored and charged in US dollars (integer cents). */
+  currency: "USD",
+  location: "Online, serving learners worldwide",
   // TODO: owner to supply real contact details (see TODO_OWNER.md).
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "hello@akwasuccess.com",
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "254700000000",
-  workingHours: "Monday to Saturday, 8:00 am to 6:00 pm (EAT)",
-  responseTime: "We usually reply within one working day.",
+  /** International format, digits only (no "+"). Empty hides the WhatsApp button. TODO: owner to supply. */
+  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "",
+  workingHours: "Monday to Friday, 08:00 to 17:00 UTC",
+  responseTime: "We usually reply within one working day, wherever you are.",
   socials: [
     // TODO: owner to supply real profile links. Empty hrefs are hidden.
     { name: "Facebook", href: "" },
@@ -44,5 +44,4 @@ export function whatsappLink(message?: string) {
   return `https://wa.me/${site.whatsapp}${text}`;
 }
 
-export const isSampleDataVisible =
-  process.env.NODE_ENV !== "production" || process.env.SHOW_SAMPLE_DATA === "true";
+export const isSampleDataVisible = process.env.SHOW_SAMPLE_DATA !== "false";

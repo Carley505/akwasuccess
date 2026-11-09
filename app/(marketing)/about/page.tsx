@@ -33,7 +33,7 @@ export default function AboutPage() {
     {
       icon: HeartHandshake,
       title: "Accessible to every learner",
-      body: "Designed for phones, readable offline, and priced fairly with instant M-Pesa and card checkout.",
+      body: "Designed for phones, readable offline, and priced fairly in USD with instant card checkout.",
     },
   ];
 
@@ -50,10 +50,9 @@ export default function AboutPage() {
           <div className="prose-site lg:col-span-7">
             <h2 id="mission-heading">Why Akwasuccess exists</h2>
             <p>
-              <strong>{site.name}</strong> (*{site.tagline}*) is a Nairobi-based education and
-              services platform dedicated to helping learners across Kenya, East Africa, and the
-              wider English-speaking world build practical skills in finance, the digital economy,
-              technology, and everyday wellbeing.
+              <strong>{site.name}</strong> (*{site.tagline}*) is an education and
+              services platform dedicated to helping learners around the world build practical
+              skills in finance, the digital economy, technology, and everyday wellbeing.
             </p>
             <p>
               Too much material online is either written in dense academic language or packaged as
@@ -139,7 +138,7 @@ export default function AboutPage() {
               <h3 className="text-xl font-bold">Get in touch</h3>
               <p className="text-muted mt-2 text-sm">
                 Have a question about an eBook, want to book a consulting session, or need an
-                electrical installation quote in {site.location}? We would love to hear from you.
+                electrical installation or technical quote? We would love to hear from you.
               </p>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">

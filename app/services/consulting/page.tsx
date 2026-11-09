@@ -26,7 +26,7 @@ export default function ConsultingPage() {
   const processSteps = [
     { title: "1. Book", body: "Request a slot and tell us your current experience level." },
     { title: "2. Discovery call", body: "We align on your questions and learning goals." },
-    { title: "3. Session", body: "Clear, practical walkthrough at your pace (online or in-person)." },
+    { title: "3. Session", body: "Clear, practical walkthrough at your pace (online via video call)." },
     { title: "4. Follow-up notes", body: "Receive a written summary and checklist of key takeaways." },
   ];
 

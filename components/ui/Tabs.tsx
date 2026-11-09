@@ -28,11 +28,11 @@ export function Tabs({
 
   if (stackOnMobile) {
     return (
-      <div>
+      <div className="max-w-full min-w-0">
         {/* Anchor jump bar on mobile */}
         <nav
           aria-label={ariaLabel}
-          className="border-line mb-6 flex gap-2 overflow-x-auto border-b pb-2 lg:hidden"
+          className="border-line mb-6 flex max-w-full gap-2 overflow-x-auto border-b pb-2 lg:hidden"
         >
           {items.map((item) => (
             <a
@@ -109,11 +109,11 @@ export function Tabs({
   }
 
   return (
-    <div>
+    <div className="max-w-full min-w-0">
       <div
         role="tablist"
         aria-label={ariaLabel}
-        className="border-line mb-6 flex flex-wrap gap-2 border-b"
+        className="border-line mb-6 flex max-w-full flex-wrap gap-1 border-b sm:gap-2"
       >
         {items.map((item) => {
           const selected = item.id === active;

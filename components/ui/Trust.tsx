@@ -15,10 +15,6 @@ export function PaymentBadges({ className, dark }: { className?: string; dark?: 
   return (
     <ul className={cn("flex flex-wrap items-center gap-2", className)} aria-label="Accepted payment methods">
       <li className={chip}>
-        <span className="text-[#2e8b3a]">M</span>
-        <span className="text-[#2e8b3a]">-PESA</span>
-      </li>
-      <li className={chip}>
         <span className="text-[#1a1f71] italic">VISA</span>
       </li>
       <li className={chip} aria-label="Mastercard">

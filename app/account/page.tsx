@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { BookOpen, FileDown, LogOut, Shield } from "lucide-react";
+import { BookOpen, Clock, FileDown, LogOut, Shield } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { getDb, schema as s } from "@/lib/db";
-import { createSignedDownloadToken } from "@/lib/storage";
+import { DOWNLOAD_EXPIRY_HOURS, createSignedDownloadToken } from "@/lib/storage";
+import { syncUserWooOrders } from "@/lib/woocommerce";
 import { PageHeader, Section } from "@/components/ui/Layout";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { LinkButton } from "@/components/ui/Button";
@@ -13,33 +14,48 @@ import {
   MagicLinkLoginForm,
   ResendDownloadsForm,
 } from "@/components/account/AccountAuthForms";
-import { formatDate, formatKes } from "@/lib/utils";
+import { formatDate, formatMoney } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "My Account & Library",
 };
 
-export default async function AccountPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  const sp = (await searchParams) ?? {};
+  const redirectParam = Array.isArray(sp.redirect) ? sp.redirect[0] : sp.redirect;
+  const emailParam = Array.isArray(sp.email) ? sp.email[0] : sp.email;
+  const redirectTo =
+    redirectParam && redirectParam.startsWith("/") ? redirectParam : "/account";
+
   const user = await getSessionUser();
 
   if (!user) {
     return (
       <>
         <PageHeader
-          title="My Account & Library"
-          intro="Access your purchased eBooks, online courses, receipts, and certificates with a passwordless magic link."
+          title="Sign Up / Log In to My Account"
+          intro="Sign in or create your account with a passwordless magic link to view your complete order history, save & persist your cart items across devices, and generate fresh 4-hour download links anytime."
           breadcrumbs={<Breadcrumbs items={[{ name: "Account" }]} />}
         />
 
         <Section>
           <div className="grid gap-8 md:grid-cols-2">
-            <MagicLinkLoginForm redirectTo="/account" />
+            <MagicLinkLoginForm redirectTo={redirectTo} defaultEmail={emailParam} />
             <ResendDownloadsForm />
           </div>
         </Section>
       </>
     );
   }
+
+  // Sync any orders (including past guest checkouts) from WooCommerce for this user
+  await syncUserWooOrders(user).catch(() => {});
 
   const db = await getDb();
   const [ents, userOrders] = await Promise.all([
@@ -91,7 +107,7 @@ export default async function AccountPage() {
     <>
       <PageHeader
         title="My Account"
-        intro={`Signed in as ${user.email}`}
+        intro={`Signed in as ${user.email} • Your cart items and order history are synced to your account.`}
         breadcrumbs={<Breadcrumbs items={[{ name: "Account" }]} />}
       >
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -124,14 +140,21 @@ export default async function AccountPage() {
         <div className="grid gap-10 lg:grid-cols-12">
           {/* Library */}
           <div className="space-y-4 lg:col-span-7">
-            <h2 className="gold-rule text-2xl">My Library</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="gold-rule text-2xl">My Library &amp; Courses</h2>
+              <span className="text-muted inline-flex items-center gap-1 text-xs">
+                <Clock className="size-3.5" aria-hidden />
+                Links valid for {DOWNLOAD_EXPIRY_HOURS} hours (refresh anytime for a new link)
+              </span>
+            </div>
+
             {libraryItems.length === 0 ? (
               <div className="card space-y-3 p-6">
                 <p className="text-muted text-sm">
                   You do not have any eBooks or courses in your library yet.
                 </p>
                 <LinkButton href="/shop" size="sm">
-                  Browse eBooks
+                  Browse eBooks &amp; Courses
                 </LinkButton>
               </div>
             ) : (
@@ -142,7 +165,10 @@ export default async function AccountPage() {
                     className="card flex flex-wrap items-center justify-between gap-4 p-5"
                   >
                     <div>
-                      <Badge tone="green">{product.type}</Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="green">{product.type}</Badge>
+                        <span className="text-link text-xs font-semibold">Access Confirmed</span>
+                      </div>
                       <h3 className="mt-1 text-lg font-bold">{product.title}</h3>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -152,17 +178,19 @@ export default async function AccountPage() {
                           className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 items-center gap-2 rounded-md px-4 text-sm font-semibold no-underline"
                         >
                           <FileDown className="size-4" aria-hidden />
-                          <span>Download ({format})</span>
+                          <span>
+                            Download {format} ({DOWNLOAD_EXPIRY_HOURS}h link)
+                          </span>
                         </a>
                       )}
-                      {product.type === "course" && (
+                      {(product.type === "course" || product.type === "tutorial") && (
                         <LinkButton
                           href={`/account/courses/${product.slug}`}
                           size="sm"
                           variant="secondary"
                           icon={<BookOpen className="size-4" aria-hidden />}
                         >
-                          Open course player
+                          Course &amp; video player
                         </LinkButton>
                       )}
                     </div>
@@ -175,7 +203,7 @@ export default async function AccountPage() {
           {/* Orders & Resend tool */}
           <div className="space-y-6 lg:col-span-5">
             <div>
-              <h2 className="gold-rule text-2xl">Orders &amp; receipts</h2>
+              <h2 className="gold-rule text-2xl">Order history &amp; receipts</h2>
               {userOrders.length === 0 ? (
                 <p className="text-muted mt-3 text-sm">No orders yet.</p>
               ) : (
@@ -194,9 +222,10 @@ export default async function AccountPage() {
                         </Link>
                         <p className="text-muted text-xs">
                           {formatDate(o.createdAt)} • <span className="capitalize">{o.status}</span>
+                          {o.wooOrderId ? ` • WC #${o.wooOrderId}` : ""}
                         </p>
                       </div>
-                      <span className="font-bold">{formatKes(o.totalKes)}</span>
+                      <span className="font-bold">{formatMoney(o.totalCents)}</span>
                     </li>
                   ))}
                 </ul>

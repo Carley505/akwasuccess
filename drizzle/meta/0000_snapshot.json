@@ -447,8 +447,8 @@
           "notNull": true,
           "default": true
         },
-        "min_subtotal_kes": {
-          "name": "min_subtotal_kes",
+        "min_subtotal_cents": {
+          "name": "min_subtotal_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -1033,8 +1033,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "unit_price_kes": {
-          "name": "unit_price_kes",
+        "unit_price_cents": {
+          "name": "unit_price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -1124,21 +1124,21 @@
           "notNull": true,
           "default": "'pending'"
         },
-        "subtotal_kes": {
-          "name": "subtotal_kes",
+        "subtotal_cents": {
+          "name": "subtotal_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "discount_kes": {
-          "name": "discount_kes",
+        "discount_cents": {
+          "name": "discount_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
-        "total_kes": {
-          "name": "total_kes",
+        "total_cents": {
+          "name": "total_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -1370,8 +1370,8 @@
           "notNull": true,
           "default": "'pending'"
         },
-        "amount_kes": {
-          "name": "amount_kes",
+        "amount_cents": {
+          "name": "amount_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -1603,15 +1603,15 @@
           "notNull": true,
           "default": "'beginner'"
         },
-        "price_kes": {
-          "name": "price_kes",
+        "price_cents": {
+          "name": "price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
-        "sale_price_kes": {
-          "name": "sale_price_kes",
+        "sale_price_cents": {
+          "name": "sale_price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -2364,7 +2364,6 @@
       "name": "payment_method",
       "schema": "public",
       "values": [
-        "mpesa",
         "card",
         "free"
       ]
@@ -2373,7 +2372,6 @@
       "name": "payment_provider",
       "schema": "public",
       "values": [
-        "mpesa",
         "paystack",
         "mock"
       ]

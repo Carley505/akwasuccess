@@ -27,7 +27,7 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
+        <Dialog.Overlay className="bg-overlay fixed inset-0 z-50 backdrop-blur-[1px]" />
         <Dialog.Content
           className={cn(
             "bg-surface text-fg border-line fixed z-50 flex flex-col focus:outline-none",

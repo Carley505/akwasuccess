@@ -53,7 +53,7 @@ export function ProductGallery({
           ? outcomes.slice(0, 4)
           : [
               "Understand the fundamentals in plain, everyday English",
-              "Follow clear diagrams and real East African examples",
+              "Follow clear diagrams and real-world practical examples",
               "Avoid common beginner mistakes and stay safe",
             ],
     },

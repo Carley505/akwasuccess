@@ -7,9 +7,11 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  FileDown,
   ListVideo,
   Lock,
   PlayCircle,
+  ShieldCheck,
   Wifi,
 } from "lucide-react";
 import { Button, LinkButton } from "@/components/ui/Button";
@@ -49,15 +51,19 @@ function readSavedCourse(courseSlug: string): { completed?: string[]; lastSlug?:
 export function CoursePlayerClient({
   courseSlug,
   courseTitle,
+  courseDescription,
   modules,
   hasFullAccess,
+  resourceDownloadUrl,
   initialCompletedIds,
   initialLessonSlug,
 }: {
   courseSlug: string;
   courseTitle: string;
+  courseDescription?: string;
   modules: PlayerModule[];
   hasFullAccess: boolean;
+  resourceDownloadUrl?: string | null;
   initialCompletedIds: string[];
   initialLessonSlug?: string;
 }) {
@@ -132,8 +138,14 @@ export function CoursePlayerClient({
 
   const progressPct =
     allLessons.length > 0
-      ? Math.round((completed.filter((id) => allLessons.some((l) => l.id === id)).length / allLessons.length) * 100)
-      : 0;
+      ? Math.round(
+          (completed.filter((id) => allLessons.some((l) => l.id === id)).length /
+            allLessons.length) *
+            100,
+        )
+      : hasFullAccess
+        ? 100
+        : 0;
 
   const lessonList = (
     <div className="space-y-4">
@@ -168,9 +180,7 @@ export function CoursePlayerClient({
                       )}
                       <span className="line-clamp-1">{l.title}</span>
                     </span>
-                    {l.isPreview && !hasFullAccess && (
-                      <Badge tone="green">Preview</Badge>
-                    )}
+                    {l.isPreview && !hasFullAccess && <Badge tone="green">Preview</Badge>}
                   </button>
                 </li>
               );
@@ -183,27 +193,65 @@ export function CoursePlayerClient({
 
   return (
     <div className="space-y-6">
+      {/* Access Permission Confirmation & 4-hour timed download bar */}
+      {hasFullAccess && (
+        <div className="card border-primary bg-tint/40 flex flex-wrap items-center justify-between gap-4 border-2 p-5">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="text-link mt-0.5 size-6 shrink-0" aria-hidden />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-bold">
+                  Access Permission Confirmed — {courseTitle}
+                </h2>
+                <Badge tone="green">Verified Enrolment</Badge>
+              </div>
+              <p className="text-muted mt-1 text-xs">
+                Your payment has been verified. You now have permission to play course videos on
+                this page and download the course resource below (each signed download link is valid
+                for 4 hours; refresh or visit your Account Library anytime for a fresh link).
+              </p>
+            </div>
+          </div>
+
+          {resourceDownloadUrl && (
+            <a
+              href={resourceDownloadUrl}
+              className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 items-center gap-2 rounded-md px-4 text-sm font-semibold no-underline"
+            >
+              <FileDown className="size-4" aria-hidden />
+              <span>Download Course Resource (4h link)</span>
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Top progress bar + mobile drawer button */}
       <div className="card flex flex-wrap items-center justify-between gap-4 p-4">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="border-line bg-surface hover:border-primary inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-semibold lg:hidden"
-          >
-            <ListVideo className="size-4" aria-hidden />
-            <span>Lessons ({allLessons.length})</span>
-          </button>
+          {allLessons.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="border-line bg-surface hover:border-primary inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-semibold lg:hidden"
+            >
+              <ListVideo className="size-4" aria-hidden />
+              <span>Lessons ({allLessons.length})</span>
+            </button>
+          )}
           <div>
             <p className="font-bold">{courseTitle}</p>
             <p className="text-muted text-xs">
-              Progress: {progressPct}% ({completed.length} of {allLessons.length} lessons completed)
+              {allLessons.length > 0
+                ? `Progress: ${progressPct}% (${completed.length} of ${allLessons.length} lessons completed)`
+                : hasFullAccess
+                  ? "Status: Enrolled • Course resource & video stream unlocked"
+                  : "Status: Enrolment required"}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {progressPct === 100 && (
+          {progressPct === 100 && hasFullAccess && (
             <a
               href={`/api/certificates/${courseSlug}`}
               className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 items-center gap-1.5 rounded-md px-4 text-sm font-semibold no-underline"
@@ -217,18 +265,24 @@ export function CoursePlayerClient({
 
       <div className="grid items-start gap-8 lg:grid-cols-12">
         {/* Desktop lesson sidebar */}
-        <aside
-          aria-label="Course lessons"
-          className="card hidden p-5 lg:col-span-4 lg:block"
-        >
-          {lessonList}
-        </aside>
+        {allLessons.length > 0 && (
+          <aside
+            aria-label="Course lessons"
+            className="card hidden p-5 lg:col-span-4 lg:block"
+          >
+            {lessonList}
+          </aside>
+        )}
 
         {/* Video + lesson notes */}
-        <div className="space-y-6 lg:col-span-8">
+        <div
+          className={`space-y-6 ${
+            allLessons.length > 0 ? "lg:col-span-8" : "lg:col-span-12"
+          }`}
+        >
           {currentLesson ? (
             <>
-              <div className="overflow-hidden rounded-lg border border-line bg-green-900 text-white">
+              <div className="border-line overflow-hidden rounded-lg border bg-green-900 text-white">
                 {canWatchCurrent ? (
                   <div className="flex aspect-video flex-col justify-between p-6">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -262,8 +316,7 @@ export function CoursePlayerClient({
                         {currentLesson.title}
                       </h2>
                       <p className="mt-1 text-xs text-white/80">
-                        Adaptive video player placeholder ({quality}) — owner will attach Mux / Bunny
-                        Stream video ID in /admin.
+                        Adaptive video player ({quality}) — video stream unlocked for your account.
                       </p>
                     </div>
 
@@ -278,8 +331,9 @@ export function CoursePlayerClient({
                       Enrol in {courseTitle} to unlock this lesson
                     </h2>
                     <p className="max-w-md text-sm text-white/80">
-                      Preview lessons are free to watch. Purchase the full course with M-Pesa or
-                      card for lifetime access to all modules and your completion certificate.
+                      Preview lessons are free to watch. Purchase the full course by card in USD for
+                      instant access to all modules, downloadable course resources, and your
+                      completion certificate.
                     </p>
                     <LinkButton href={`/courses/${courseSlug}`} size="sm">
                       View course &amp; enrol
@@ -326,8 +380,70 @@ export function CoursePlayerClient({
                 </p>
               </div>
             </>
+          ) : hasFullAccess ? (
+            <div className="space-y-6">
+              <div className="border-line overflow-hidden rounded-lg border bg-green-900 text-white">
+                <div className="flex aspect-video flex-col justify-between p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/30 px-3 py-1 font-semibold">
+                      <Wifi className="size-3.5 text-gold-500" aria-hidden />
+                      Video Player Ready ({quality}) • Permission Active
+                    </span>
+                    <Badge tone="green">Unlocked</Badge>
+                  </div>
+
+                  <div className="my-auto mx-auto max-w-lg space-y-3 text-center">
+                    <PlayCircle className="mx-auto size-14 text-gold-500" aria-hidden />
+                    <h2 className="font-serif text-xl font-bold text-white md:text-2xl">
+                      {courseTitle} — Course &amp; Video Access Unlocked
+                    </h2>
+                    <p className="text-sm text-white/85">
+                      Your account has verified permission to access this course. Download your
+                      course PDF &amp; training resource below (timed 4-hour link), and watch video
+                      sessions right in this player as soon as video modules are published.
+                    </p>
+                    {resourceDownloadUrl && (
+                      <div className="pt-2">
+                        <a
+                          href={resourceDownloadUrl}
+                          className="bg-gold-500 text-ink-900 inline-flex min-h-11 items-center gap-2 rounded-md px-5 text-sm font-bold no-underline hover:opacity-95"
+                        >
+                          <FileDown className="size-4" aria-hidden />
+                          <span>Download Course Resource (PDF • 4h link)</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-white/75">
+                    Generate a fresh 4-hour download link anytime from your Account Library
+                  </div>
+                </div>
+              </div>
+
+              {courseDescription && (
+                <div className="card space-y-3 p-6">
+                  <h3 className="text-lg font-bold">Course overview &amp; study notes</h3>
+                  <p className="text-muted whitespace-pre-line text-sm">{courseDescription}</p>
+                </div>
+              )}
+            </div>
           ) : (
-            <p className="text-muted">No lessons configured yet.</p>
+            <div className="border-line overflow-hidden rounded-lg border bg-green-900 text-white">
+              <div className="flex aspect-video flex-col items-center justify-center gap-3 p-6 text-center">
+                <Lock className="size-10 text-gold-500" aria-hidden />
+                <h2 className="font-serif text-xl font-bold text-white">
+                  Enrol in {courseTitle} to unlock video &amp; resource access
+                </h2>
+                <p className="max-w-md text-sm text-white/80">
+                  Purchase this course in USD to unlock immediate access to the course resource
+                  download (timed 4-hour links, renewable anytime in your account) and video player.
+                </p>
+                <LinkButton href={`/shop/${courseSlug}`} size="sm">
+                  View course &amp; enrol
+                </LinkButton>
+              </div>
+            </div>
           )}
         </div>
       </div>

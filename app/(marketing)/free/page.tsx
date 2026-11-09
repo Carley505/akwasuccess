@@ -36,7 +36,7 @@ export default function FreeResourcesPage() {
             </h2>
             <p className="text-muted">
               Keep this printable checklist beside you before setting up a wallet, writing down a
-              recovery phrase, or using P2P with M-Pesa. Enter your email to receive the checklist
+              recovery phrase, or using P2P exchanges. Enter your email to receive the checklist
               and beginner study notes, or download the PDF directly below.
             </p>
             <p className="text-sm">

@@ -10,7 +10,7 @@ export function RatingStars({ rating, count }: { rating: number; count: number }
         {[1, 2, 3, 4, 5].map((i) => (
           <Star
             key={i}
-            className="size-4 text-gold-500"
+            className="text-star size-4"
             fill={i <= rounded ? "currentColor" : "none"}
             strokeWidth={1.75}
           />

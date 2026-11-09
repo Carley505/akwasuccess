@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  CheckCircle2,
   ChevronDown,
   CreditCard,
-  Loader2,
-  PhoneCall,
-  RefreshCw,
+  Lock,
   ShieldAlert,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { PageHeader, Section } from "@/components/ui/Layout";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
@@ -20,118 +19,96 @@ import { PriceTag } from "@/components/ui/PriceTag";
 import { GuaranteeBadge, PaymentBadges, SecureNote } from "@/components/ui/Trust";
 import { EmptyState } from "@/components/ui/States";
 import { disclaimers } from "@/content/site";
-import { cart, useCart } from "@/lib/cart/store";
+import { cart, useCart, useCartAccountStatus } from "@/lib/cart/store";
 import { computeTotals } from "@/lib/pricing";
-import { isValidKenyanPhone } from "@/lib/phone";
 import { track } from "@/lib/analytics/client";
-import { formatKes } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 
-type PaymentStep =
-  | { state: "form" }
-  | {
-      state: "mpesa-waiting";
-      paymentId: string;
-      orderId: string;
-      orderNumber: string;
-      provider: "mpesa" | "mock";
-      message: string;
-      secondsLeft: number;
+type CheckoutResponse = {
+  error?: string;
+  orderId?: string;
+  orderNumber?: string;
+  paymentId?: string;
+  provider?: "paystack" | "mock";
+  status?: string;
+  reference?: string;
+  amountCents?: number;
+  email?: string;
+  accessCode?: string;
+  publicKey?: string;
+  authorizationUrl?: string;
+};
+
+type PaystackInlineHandler = {
+  openIframe: () => void;
+};
+
+type PaystackPopGlobal = {
+  setup: (opts: {
+    key: string;
+    email: string;
+    amount: number;
+    currency: string;
+    ref: string;
+    access_code?: string;
+    callback: (response: { reference: string }) => void;
+    onClose: () => void;
+  }) => PaystackInlineHandler;
+};
+
+function loadPaystackInlineScript(): Promise<PaystackPopGlobal | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  const w = window as unknown as { PaystackPop?: PaystackPopGlobal };
+  if (w.PaystackPop) return Promise.resolve(w.PaystackPop);
+
+  return new Promise((resolve) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://js.paystack.co/v1/inline.js"]',
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(w.PaystackPop ?? null), { once: true });
+      existing.addEventListener("error", () => resolve(null), { once: true });
+      return;
     }
-  | {
-      state: "failed";
-      paymentId: string;
-      reason: string;
-    };
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    script.onload = () => resolve(w.PaystackPop ?? null);
+    script.onerror = () => resolve(null);
+    document.head.appendChild(script);
+  });
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCart();
+  const account = useCartAccountStatus();
 
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [method, setMethod] = useState<"mpesa" | "card">("mpesa");
   const [marketingConsent, setMarketingConsent] = useState(false);
 
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{
     code: string;
-    discountKes: number;
+    discountCents: number;
   } | null>(null);
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<PaymentStep>({ state: "form" });
+
+  const effectiveEmail = email || account.user?.email || "";
+  const effectiveName = name || account.user?.name || "";
 
   const totals = computeTotals(
-    items.map((i) => i.priceKes),
-    appliedCoupon?.discountKes ?? 0,
+    items.map((i) => i.priceCents),
+    appliedCoupon?.discountCents ?? 0,
   );
 
   const hasCryptoOrFinance = items.some(
     (i) => i.categorySlug === "crypto" || i.categorySlug === "finance",
   );
-
-  useEffect(() => {
-    if (items.length > 0) {
-      track("begin_checkout", { itemCount: items.length, totalKes: totals.totalKes });
-    }
-  }, [items.length, totals.totalKes]);
-
-  // Poll M-Pesa payment status & countdown (75s timeout per Spec 8.4)
-  useEffect(() => {
-    if (step.state !== "mpesa-waiting") return;
-
-    const countdown = window.setInterval(() => {
-      setStep((prev) => {
-        if (prev.state !== "mpesa-waiting") return prev;
-        if (prev.secondsLeft <= 1) {
-          track("checkout_error", { reason: "mpesa_timeout" });
-          return {
-            state: "failed",
-            paymentId: prev.paymentId,
-            reason:
-              "The M-Pesa PIN prompt timed out after 75 seconds. Your cart is saved—click below to retry.",
-          };
-        }
-        return { ...prev, secondsLeft: prev.secondsLeft - 1 };
-      });
-    }, 1000);
-
-    const poll = window.setInterval(async () => {
-      try {
-        const res = await fetch(`/api/payments/${step.paymentId}/status`);
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          status: string;
-          orderId: string;
-          failureReason?: string;
-        };
-        if (data.status === "succeeded") {
-          track("purchase", { value: totals.totalKes, method: "mpesa" });
-          cart.clear();
-          router.push(`/checkout/order/${data.orderId}`);
-        } else if (data.status === "failed" || data.status === "timeout") {
-          track("checkout_error", { reason: data.status });
-          setStep({
-            state: "failed",
-            paymentId: step.paymentId,
-            reason:
-              data.failureReason ||
-              "M-Pesa payment was not completed. Your cart is still safe—try again when ready.",
-          });
-        }
-      } catch {
-        /* ignore transient poll error */
-      }
-    }, 2000);
-
-    return () => {
-      window.clearInterval(countdown);
-      window.clearInterval(poll);
-    };
-  }, [step, router, totals.totalKes]);
 
   async function handleApplyCoupon() {
     setCouponMsg(null);
@@ -140,15 +117,15 @@ export default function CheckoutPage() {
     const res = await fetch("/api/checkout/coupon", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code, subtotalKes: totals.subtotalKes }),
+      body: JSON.stringify({ code, subtotalCents: totals.subtotalCents }),
     });
-    const data = (await res.json()) as { code?: string; discountKes?: number; error?: string };
+    const data = (await res.json()) as { code?: string; discountCents?: number; error?: string };
     if (!res.ok || !data.code) {
       setAppliedCoupon(null);
       setCouponMsg(data.error ?? "Invalid coupon code.");
     } else {
-      setAppliedCoupon({ code: data.code, discountKes: data.discountKes ?? 0 });
-      setCouponMsg(`Applied ${data.code} (-${formatKes(data.discountKes ?? 0)})`);
+      setAppliedCoupon({ code: data.code, discountCents: data.discountCents ?? 0 });
+      setCouponMsg(`Applied ${data.code} (-${formatMoney(data.discountCents ?? 0)})`);
     }
   }
 
@@ -156,98 +133,122 @@ export default function CheckoutPage() {
     e.preventDefault();
     setError(null);
 
-    if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid email address for your receipt and download link.");
-      return;
-    }
-    if (method === "mpesa" && !isValidKenyanPhone(phone)) {
-      setError(
-        "Please enter a valid Kenyan M-Pesa phone number (e.g. 0712 345 678 or 0110 123 456).",
-      );
+    if (!effectiveEmail.trim() || !effectiveEmail.includes("@")) {
+      setError("Please enter a valid email address for your receipt and 4-hour download link.");
       return;
     }
 
     setSubmitting(true);
-    track("payment_method_chosen", { method });
+    track("payment_method_chosen", { method: "card" });
 
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          email,
-          phone,
-          name,
-          method,
+          email: effectiveEmail,
+          name: effectiveName,
           productIds: items.map((i) => i.productId),
           couponCode: appliedCoupon?.code ?? null,
           marketingConsent,
         }),
       });
-      const data = (await res.json()) as {
-        error?: string;
-        orderId?: string;
-        orderNumber?: string;
-        paymentId?: string;
-        provider?: "mpesa" | "paystack" | "mock";
-        status?: string;
-        message?: string;
-        authorizationUrl?: string;
-      };
+      const data = (await res.json()) as CheckoutResponse;
 
       if (!res.ok || !data.orderId || !data.paymentId) {
+        track("checkout_error", { reason: "checkout_start_failed" });
         setError(data.error ?? "Could not start checkout. Please try again.");
         setSubmitting(false);
         return;
       }
 
       if (data.status === "succeeded") {
-        track("purchase", { value: totals.totalKes, method });
+        track("purchase", { value: totals.totalCents, currency: "USD" });
         cart.clear();
         router.push(`/checkout/order/${data.orderId}`);
         return;
       }
 
-      if (method === "mpesa") {
-        setStep({
-          state: "mpesa-waiting",
-          paymentId: data.paymentId,
-          orderId: data.orderId,
-          orderNumber: data.orderNumber ?? "",
-          provider: data.provider === "mpesa" ? "mpesa" : "mock",
-          message:
-            data.message ?? "Check your phone and enter your M-Pesa PIN to complete payment.",
-          secondsLeft: 75,
-        });
-      } else if (data.provider === "mock") {
-        // Sandbox card mode: settle and redirect to order confirmation
+      if (data.provider === "mock") {
+        // Sandbox fallback when live Paystack keys have not been added yet
         await fetch(`/api/payments/${data.paymentId}/status`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ action: "succeed" }),
         });
-        track("purchase", { value: totals.totalKes, method: "card" });
+        track("purchase", { value: totals.totalCents, currency: "USD" });
         cart.clear();
         router.push(`/checkout/order/${data.orderId}`);
-      } else if (data.authorizationUrl) {
-        window.location.href = data.authorizationUrl;
+        return;
       }
+
+      // Option A: Seamless In-Site Paystack Inline Checkout
+      const publicKey =
+        data.publicKey || process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
+
+      if (publicKey && data.reference) {
+        const paystackPop = await loadPaystackInlineScript();
+        if (paystackPop) {
+          const handler = paystackPop.setup({
+            key: publicKey,
+            email: data.email || effectiveEmail.trim(),
+            amount: data.amountCents ?? totals.totalCents,
+            currency: "USD",
+            ref: data.reference,
+            access_code: data.accessCode,
+            callback: (response) => {
+              void (async () => {
+                setSubmitting(true);
+                const verifyRes = await fetch("/api/payments/verify", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    paymentId: data.paymentId,
+                    reference: response.reference || data.reference,
+                  }),
+                });
+                const verifyJson = (await verifyRes.json().catch(() => ({}))) as {
+                  ok?: boolean;
+                  error?: string;
+                };
+                if (!verifyRes.ok || !verifyJson.ok) {
+                  setError(
+                    verifyJson.error ??
+                      "We could not confirm your payment yet. If your card was charged, check your email in 60 seconds.",
+                  );
+                  setSubmitting(false);
+                  return;
+                }
+                track("purchase", { value: totals.totalCents, currency: "USD" });
+                cart.clear();
+                router.push(`/checkout/order/${data.orderId}`);
+              })();
+            },
+            onClose: () => {
+              setSubmitting(false);
+              setError(
+                "Payment popup was closed before completion. Your cart is safe—click Pay securely when ready.",
+              );
+            },
+          });
+          handler.openIframe();
+          return;
+        }
+      }
+
+      // Fallback to Paystack authorization URL if inline script is blocked by browser extension
+      if (data.authorizationUrl) {
+        window.location.assign(data.authorizationUrl);
+        return;
+      }
+      setSubmitting(false);
     } catch {
       setError("Network error while connecting to checkout. Your cart is safe—please retry.");
-    } finally {
       setSubmitting(false);
     }
   }
 
-  async function simulateSandbox(paymentId: string, action: "succeed" | "fail" | "timeout") {
-    await fetch(`/api/payments/${paymentId}/status`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-  }
-
-  if (items.length === 0 && step.state === "form") {
+  if (items.length === 0) {
     return (
       <>
         <PageHeader
@@ -269,7 +270,7 @@ export default function CheckoutPage() {
     <>
       <PageHeader
         title="Secure Checkout"
-        intro="Guest checkout—your download link unlocks immediately and is emailed to you within 60 seconds."
+        intro="Seamless in-site checkout — your 4-hour timed download link and course access unlock immediately on the confirmation page and by email. All prices are in US dollars (USD)."
         breadcrumbs={[
           <Breadcrumbs
             key="b"
@@ -279,6 +280,34 @@ export default function CheckoutPage() {
       />
 
       <Section>
+        {/* Guest freedom vs Account sign-up/log-in notice */}
+        <div className="card border-primary/30 bg-tint/30 mb-6 flex flex-wrap items-center justify-between gap-4 border p-4 text-sm">
+          {account.authenticated && account.user ? (
+            <div className="flex items-center gap-2.5">
+              <UserCheck className="text-link size-5 shrink-0" aria-hidden />
+              <p>
+                Signed in as <strong>{account.user.email}</strong> — this order will be saved to
+                your account order history and library.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start gap-2.5">
+                <UserPlus className="text-link mt-0.5 size-5 shrink-0" aria-hidden />
+                <p>
+                  <strong>Guest checkout is open:</strong> you can complete your purchase right now
+                  without an account. To <strong>view your order history</strong>,{" "}
+                  <strong>save &amp; persist your cart items</strong>, or generate fresh 4-hour
+                  download links anytime, please sign up or log in.
+                </p>
+              </div>
+              <LinkButton href="/account?redirect=/checkout" variant="secondary" size="sm">
+                Sign up / Log in
+              </LinkButton>
+            </>
+          )}
+        </div>
+
         {/* Collapsible order summary on mobile */}
         <details className="card mb-6 p-4 lg:hidden">
           <summary className="flex items-center justify-between font-semibold">
@@ -286,7 +315,7 @@ export default function CheckoutPage() {
               Order summary ({items.length} {items.length === 1 ? "item" : "items"})
             </span>
             <span className="flex items-center gap-1 font-bold">
-              {formatKes(totals.totalKes)}
+              {formatMoney(totals.totalCents)}
               <ChevronDown className="chevron size-4 transition-transform" aria-hidden />
             </span>
           </summary>
@@ -294,7 +323,7 @@ export default function CheckoutPage() {
             {items.map((i) => (
               <li key={i.productId} className="flex justify-between py-2">
                 <span>{i.title}</span>
-                <span className="font-semibold">{formatKes(i.priceKes)}</span>
+                <span className="font-semibold">{formatMoney(i.priceCents)}</span>
               </li>
             ))}
           </ul>
@@ -302,220 +331,96 @@ export default function CheckoutPage() {
 
         <div className="grid gap-8 lg:grid-cols-12">
           <div className="lg:col-span-7">
-            {step.state === "mpesa-waiting" ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="card space-y-5 p-6 text-center md:p-8"
-              >
-                <div className="bg-tint text-link mx-auto grid size-14 place-items-center rounded-full">
-                  <PhoneCall className="size-7" aria-hidden />
-                </div>
-                <h2 className="text-2xl font-bold">Check your phone and enter your M-Pesa PIN</h2>
-                <p className="text-muted mx-auto max-w-md">{step.message}</p>
-
-                <div className="text-link inline-flex items-center gap-2 text-sm font-semibold">
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  <span>Waiting for confirmation ({step.secondsLeft}s remaining)...</span>
-                </div>
-
-                {step.provider === "mock" && (
-                  <div className="border-line bg-surface-2 space-y-3 rounded-lg border p-4 text-left text-xs">
-                    <p className="font-bold uppercase">
-                      Sandbox M-Pesa Simulator (active because live Daraja keys are not set)
-                    </p>
-                    <p className="text-muted">
-                      Choose an outcome below to test the live webhook and polling flow:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => simulateSandbox(step.paymentId, "succeed")}
-                        icon={<CheckCircle2 className="size-4" aria-hidden />}
-                      >
-                        Simulate PIN Approved
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => simulateSandbox(step.paymentId, "fail")}
-                      >
-                        Simulate Wrong PIN
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => simulateSandbox(step.paymentId, "timeout")}
-                      >
-                        Simulate Timeout
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : step.state === "failed" ? (
-              <div role="alert" className="card space-y-4 p-6 md:p-8">
-                <h2 className="text-xl font-bold">Payment was not completed</h2>
-                <p className="text-muted">{step.reason}</p>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => setStep({ state: "form" })}
-                    icon={<RefreshCw className="size-4" aria-hidden />}
-                  >
-                    Try again (your cart is saved)
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setMethod("card");
-                      setStep({ state: "form" });
-                    }}
-                  >
-                    Switch to Card payment
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={onSubmit} className="card space-y-6 p-6 md:p-8" noValidate>
-                <div className="space-y-4">
-                  <h2 className="text-xl font-bold">1. Where should we send your download?</h2>
-                  <Field
+            <form onSubmit={onSubmit} className="card space-y-6 p-6 md:p-8" noValidate>
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold">1. Where should we send your download?</h2>
+                <Field
+                  id="checkout-email"
+                  label="Email address"
+                  hint="We send your receipt, 4-hour timed download link, and account sign-in link here."
+                >
+                  <Input
                     id="checkout-email"
-                    label="Email address"
-                    hint="We send your receipt, instant download link, and account magic link here."
-                  >
-                    <Input
-                      id="checkout-email"
-                      name="email"
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      required
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </Field>
-
-                  <Field id="checkout-name" label="Your name" optional>
-                    <Input
-                      id="checkout-name"
-                      name="name"
-                      autoComplete="name"
-                      placeholder="e.g. Wanjiku Kamau"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </Field>
-                </div>
-
-                {/* Payment method selector (M-Pesa first for Kenya, then Card) */}
-                <fieldset className="space-y-3">
-                  <legend className="text-xl font-bold">2. Choose payment method</legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label
-                      className={`card flex cursor-pointer items-start gap-3 p-4 ${
-                        method === "mpesa" ? "border-primary bg-tint/40 border-2" : ""
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value="mpesa"
-                        checked={method === "mpesa"}
-                        onChange={() => setMethod("mpesa")}
-                        className="mt-1 size-5 accent-[var(--green-700)]"
-                      />
-                      <div>
-                        <span className="block font-bold">M-Pesa STK Push</span>
-                        <span className="text-muted text-xs">
-                          Enter your number and approve with your M-Pesa PIN on your phone.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label
-                      className={`card flex cursor-pointer items-start gap-3 p-4 ${
-                        method === "card" ? "border-primary bg-tint/40 border-2" : ""
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value="card"
-                        checked={method === "card"}
-                        onChange={() => setMethod("card")}
-                        className="mt-1 size-5 accent-[var(--green-700)]"
-                      />
-                      <div>
-                        <span className="flex items-center gap-1.5 font-bold">
-                          <CreditCard className="size-4" aria-hidden /> Card (Visa / Mastercard)
-                        </span>
-                        <span className="text-muted text-xs">
-                          Pay securely with any local or international debit or credit card.
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </fieldset>
-
-                {method === "mpesa" && (
-                  <Field
-                    id="checkout-phone"
-                    label="M-Pesa phone number"
-                    hint="Formats accepted: 0712 345 678, 0110 123 456, or 254712345678."
-                  >
-                    <Input
-                      id="checkout-phone"
-                      name="phone"
-                      type="tel"
-                      inputMode="numeric"
-                      autoComplete="tel"
-                      required
-                      placeholder="0712 345 678"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </Field>
-                )}
-
-                <label className="flex items-start gap-2.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={marketingConsent}
-                    onChange={(e) => setMarketingConsent(e.target.checked)}
-                    className="mt-1 size-5 rounded border-line accent-[var(--green-700)]"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    required
+                    placeholder="you@example.com"
+                    value={effectiveEmail}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
-                  <span className="text-muted">
-                    Send me occasional free study guides and new eBook updates (optional;
-                    unsubscribe anytime).
-                  </span>
-                </label>
+                </Field>
 
-                {error && <FormAlert tone="error">{error}</FormAlert>}
+                <Field id="checkout-name" label="Your name" optional>
+                  <Input
+                    id="checkout-name"
+                    name="name"
+                    autoComplete="name"
+                    placeholder="e.g. Alex Morgan"
+                    value={effectiveName}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </Field>
+              </div>
 
-                {hasCryptoOrFinance && (
-                  <div className="border-gold-500 bg-tint-gold flex items-start gap-2.5 rounded-md border-l-4 p-3 text-xs">
-                    <ShieldAlert
-                      className="text-gold-text mt-0.5 size-4 shrink-0"
-                      aria-hidden
-                    />
-                    <p>{disclaimers.crypto}</p>
+              <fieldset className="space-y-3">
+                <legend className="text-xl font-bold">2. Payment (In-Site Card Checkout)</legend>
+                <div className="card border-primary bg-tint/40 flex items-start gap-3 border-2 p-4">
+                  <CreditCard className="text-link mt-0.5 size-5 shrink-0" aria-hidden />
+                  <div>
+                    <span className="block font-bold">Credit or debit card (Paystack Inline)</span>
+                    <span className="text-muted text-xs">
+                      Visa, Mastercard and major cards worldwide. Complete payment right on this
+                      page in US dollars (USD). Once confirmed, your 4-hour download and course
+                      access unlock immediately.
+                    </span>
                   </div>
-                )}
-
-                <Button type="submit" size="lg" block loading={submitting}>
-                  {method === "mpesa"
-                    ? `Pay ${formatKes(totals.totalKes)} with M-Pesa`
-                    : `Pay ${formatKes(totals.totalKes)} by Card`}
-                </Button>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <SecureNote />
-                  <PaymentBadges />
                 </div>
-              </form>
-            )}
+              </fieldset>
+
+              <label className="flex items-start gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={marketingConsent}
+                  onChange={(e) => setMarketingConsent(e.target.checked)}
+                  className="mt-1 size-5 rounded border-line accent-[var(--green-700)]"
+                />
+                <span className="text-muted">
+                  Send me occasional free study guides and new eBook updates (optional;
+                  unsubscribe anytime).
+                </span>
+              </label>
+
+              {error && <FormAlert tone="error">{error}</FormAlert>}
+
+              {hasCryptoOrFinance && (
+                <div className="border-gold-500 bg-tint-gold flex items-start gap-2.5 rounded-md border-l-4 p-3 text-xs">
+                  <ShieldAlert
+                    className="text-gold-text mt-0.5 size-4 shrink-0"
+                    aria-hidden
+                  />
+                  <p>{disclaimers.crypto}</p>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                size="lg"
+                block
+                loading={submitting}
+                icon={<Lock className="size-4" aria-hidden />}
+              >
+                {totals.totalCents === 0
+                  ? "Get your free download"
+                  : `Pay ${formatMoney(totals.totalCents)} securely`}
+              </Button>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <SecureNote />
+                <PaymentBadges />
+              </div>
+            </form>
           </div>
 
           {/* Desktop order summary + coupon */}
@@ -526,7 +431,7 @@ export default function CheckoutPage() {
                 {items.map((item) => (
                   <li key={item.productId} className="flex items-center justify-between gap-3 py-3">
                     <span>{item.title}</span>
-                    <PriceTag amountKes={item.priceKes} size="sm" />
+                    <PriceTag amountCents={item.priceCents} size="sm" />
                   </li>
                 ))}
               </ul>
@@ -559,18 +464,18 @@ export default function CheckoutPage() {
               <dl className="border-line space-y-2 border-t pt-4 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-muted">Subtotal</dt>
-                  <dd className="font-semibold">{formatKes(totals.subtotalKes)}</dd>
+                  <dd className="font-semibold">{formatMoney(totals.subtotalCents)}</dd>
                 </div>
-                {totals.discountKes > 0 && (
+                {totals.discountCents > 0 && (
                   <div className="text-link flex justify-between">
                     <dt>Discount ({appliedCoupon?.code})</dt>
-                    <dd className="font-semibold">-{formatKes(totals.discountKes)}</dd>
+                    <dd className="font-semibold">-{formatMoney(totals.discountCents)}</dd>
                   </div>
                 )}
                 <div className="border-line flex justify-between border-t pt-2 text-base font-bold">
-                  <dt>Total</dt>
+                  <dt>Total (USD)</dt>
                   <dd>
-                    <PriceTag amountKes={totals.totalKes} size="lg" />
+                    <PriceTag amountCents={totals.totalCents} size="lg" />
                   </dd>
                 </div>
               </dl>

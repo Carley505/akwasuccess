@@ -40,7 +40,7 @@ export default function OpenGraphImage() {
           <div style={{ fontSize: 30, color: "#E6F3EB" }}>{site.supportingLine}</div>
         </div>
         <div style={{ fontSize: 22, color: "#E6F3EB" }}>
-          eBooks • Courses • Tutorials • Consulting • M-Pesa & Card
+          eBooks • Courses • Tutorials • Consulting • Instant Digital Delivery
         </div>
       </div>
     ),

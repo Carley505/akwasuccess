@@ -4,12 +4,13 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getSessionUser } from "@/lib/auth";
 import { getDb, schema as s } from "@/lib/db";
 import { getCourseBySlug } from "@/lib/db/queries";
+import { createSignedDownloadToken } from "@/lib/storage";
 import { PageHeader, Section } from "@/components/ui/Layout";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { CoursePlayerClient } from "@/components/courses/CoursePlayerClient";
 
 export const metadata: Metadata = {
-  title: "Course Player",
+  title: "Course & Resource Access Player",
 };
 
 type Params = Promise<{ slug: string }>;
@@ -25,6 +26,7 @@ export default async function CoursePlayerPage({
   const { slug } = await params;
   const sp = await searchParams;
   const initialLessonSlug = Array.isArray(sp.lesson) ? sp.lesson[0] : sp.lesson;
+  const orderIdParam = Array.isArray(sp.order) ? sp.order[0] : sp.order;
 
   const data = await getCourseBySlug(slug);
   if (!data) notFound();
@@ -34,6 +36,9 @@ export default async function CoursePlayerPage({
 
   let hasFullAccess = data.product.isFree;
   let initialCompletedIds: string[] = [];
+  let activeEntitlement: typeof s.entitlements.$inferSelect | null = null;
+  let buyerEmail = user?.email ?? "";
+  let orderNumber: string | undefined;
 
   if (user) {
     if (user.role === "admin") hasFullAccess = true;
@@ -47,7 +52,10 @@ export default async function CoursePlayerPage({
           isNull(s.entitlements.revokedAt),
         ),
       );
-    if (ent) hasFullAccess = true;
+    if (ent) {
+      hasFullAccess = true;
+      activeEntitlement = ent;
+    }
 
     const progRows = await db
       .select()
@@ -56,18 +64,59 @@ export default async function CoursePlayerPage({
     initialCompletedIds = progRows.map((r) => r.itemId);
   }
 
+  // Also allow a guest who just completed payment to access via ?order=<orderId>
+  if (!activeEntitlement && orderIdParam) {
+    const [order] = await db.select().from(s.orders).where(eq(s.orders.id, orderIdParam));
+    if (order && order.status === "paid" && order.userId) {
+      const [ent] = await db
+        .select()
+        .from(s.entitlements)
+        .where(
+          and(
+            eq(s.entitlements.userId, order.userId),
+            eq(s.entitlements.productId, data.product.id),
+            isNull(s.entitlements.revokedAt),
+          ),
+        );
+      if (ent) {
+        hasFullAccess = true;
+        activeEntitlement = ent;
+        buyerEmail = order.email;
+        orderNumber = order.number;
+      }
+    }
+  }
+
+  let resourceDownloadUrl: string | null = null;
+  if (hasFullAccess && activeEntitlement && buyerEmail) {
+    const [file] = await db
+      .select()
+      .from(s.productFiles)
+      .where(eq(s.productFiles.productId, data.product.id));
+    if (file) {
+      const token = await createSignedDownloadToken({
+        entitlementId: activeEntitlement.id,
+        productFileId: file.id,
+        userId: activeEntitlement.userId,
+        buyerEmail,
+        orderNumber,
+      });
+      resourceDownloadUrl = `/api/download/${token}`;
+    }
+  }
+
   return (
     <>
       <PageHeader
         title={data.product.title}
-        intro="Course player — pick up right where you left off. Mobile Data Saver (360p) is enabled by default on phones."
+        intro="Course & Resource Player — your verified access page for course videos and 4-hour timed resource downloads."
         breadcrumbs={[
           <Breadcrumbs
             key="b"
             items={[
               { name: "Courses", href: "/courses" },
               { name: data.product.title, href: `/courses/${data.product.slug}` },
-              { name: "Player" },
+              { name: "Player & Access" },
             ]}
           />,
         ]}
@@ -77,8 +126,10 @@ export default async function CoursePlayerPage({
         <CoursePlayerClient
           courseSlug={data.product.slug}
           courseTitle={data.product.title}
+          courseDescription={data.product.description}
           modules={data.curriculum}
           hasFullAccess={hasFullAccess}
+          resourceDownloadUrl={resourceDownloadUrl}
           initialCompletedIds={initialCompletedIds}
           initialLessonSlug={initialLessonSlug}
         />

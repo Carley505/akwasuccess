@@ -16,7 +16,13 @@ export async function POST(req: NextRequest) {
 
   const payload = JSON.parse(rawBody) as {
     event?: string;
-    data?: { id?: number | string; reference?: string; status?: string };
+    data?: {
+      id?: number | string;
+      reference?: string;
+      status?: string;
+      amount?: number;
+      currency?: string;
+    };
   };
 
   const ref = payload.data?.reference;
@@ -34,14 +40,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const succeeded = payload.event === "charge.success" && payload.data?.status === "success";
+  // Only trust a success whose amount and currency match what we charged (USD cents).
+  const paidInFull =
+    payload.data?.currency === "USD" && Number(payload.data?.amount) === payment.amountCents;
+  const succeeded =
+    payload.event === "charge.success" && payload.data?.status === "success" && paidInFull;
   await settleOrderPayment({
     paymentId: payment.id,
     dedupeKey: `paystack:${ref}:${payload.event ?? "event"}`,
     provider: "paystack",
     outcome: succeeded ? "succeeded" : "failed",
     receiptNumber: payload.data?.id ? String(payload.data.id) : ref,
-    failureReason: succeeded ? undefined : "Card transaction was not completed.",
+    failureReason: succeeded
+      ? undefined
+      : paidInFull
+        ? "Card transaction was not completed."
+        : "Card transaction amount or currency did not match the order.",
     rawPayload: payload,
   });
 

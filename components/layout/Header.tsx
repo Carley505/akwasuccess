@@ -17,6 +17,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Modal } from "@/components/ui/Modal";
 import { SearchBar } from "@/components/layout/SearchBar";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { useCartCount } from "@/lib/cart/store";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -56,21 +57,21 @@ export function Header() {
           scrolled ? "h-[60px]" : "h-[72px]",
         )}
       >
-        <div className="container-site flex h-full items-center justify-between gap-3">
+        <div className="container-site flex h-full min-w-0 items-center justify-between gap-1.5 sm:gap-3">
           {/* Mobile left: hamburger */}
-          <div className="flex items-center lg:hidden">
+          <div className="flex shrink-0 items-center lg:hidden">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
               aria-label={t.nav.openMenu}
-              className="text-fg hover:bg-surface-2 inline-flex size-12 items-center justify-center rounded-md"
+              className="text-fg hover:bg-surface-2 inline-flex size-10 items-center justify-center rounded-md sm:size-11"
             >
-              <Menu className="size-6" strokeWidth={1.75} aria-hidden />
+              <Menu className="size-5 sm:size-6" strokeWidth={1.75} aria-hidden />
             </button>
           </div>
 
           {/* Logo (center on mobile, left on desktop) */}
-          <Logo className="lg:mr-4" />
+          <Logo className="min-w-0 shrink lg:mr-4" />
 
           {/* Desktop navigation */}
           <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
@@ -105,54 +106,59 @@ export function Header() {
                   onKeyDown={(e) => {
                     if (e.key === "Escape") setShopOpen(false);
                   }}
-                  className="card absolute top-full left-0 z-50 mt-1 w-[560px] p-5 shadow-[var(--shadow-soft)]"
+                  className="absolute top-full left-0 z-50 w-[560px] max-w-[calc(100vw-2rem)] pt-1.5"
                 >
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-2 space-y-1">
-                      <p className="text-muted px-2 pb-1 text-xs font-semibold tracking-wider uppercase">
-                        By topic
-                      </p>
-                      {shopMenu.categories.map((cat) => (
-                        <Link
-                          key={cat.href}
-                          href={cat.href}
-                          className="hover:bg-surface-2 flex items-start gap-3 rounded-md p-2 no-underline"
-                        >
-                          <span className="bg-tint text-link mt-0.5 grid size-9 shrink-0 place-items-center rounded-md">
-                            <CategoryIcon name={cat.icon} className="size-4" />
-                          </span>
-                          <span>
-                            <span className="block text-sm font-semibold">{cat.label}</span>
-                            <span className="text-muted line-clamp-1 block text-xs">
-                              {cat.description}
-                            </span>
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-
-                    <div className="border-line flex flex-col justify-between border-l pl-4">
-                      <div className="space-y-1">
-                        <p className="text-muted pb-1 text-xs font-semibold tracking-wider uppercase">
-                          By format
+                  <div className="card w-full p-5 shadow-[var(--shadow-soft)]">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-2 space-y-1">
+                        <p className="text-muted px-2 pb-1 text-xs font-semibold tracking-wider uppercase">
+                          By topic
                         </p>
-                        {shopMenu.formats.map((f) => (
+                        {shopMenu.categories.map((cat) => (
                           <Link
-                            key={f.href}
-                            href={f.href}
-                            className="hover:text-link block py-1.5 text-sm font-medium no-underline"
+                            key={cat.href}
+                            href={cat.href}
+                            onClick={() => setShopOpen(false)}
+                            className="hover:bg-surface-2 flex items-start gap-3 rounded-md p-2 no-underline"
                           >
-                            {f.label}
+                            <span className="bg-tint text-link mt-0.5 grid size-9 shrink-0 place-items-center rounded-md">
+                              <CategoryIcon name={cat.icon} className="size-4" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold">{cat.label}</span>
+                              <span className="text-muted line-clamp-1 block text-xs">
+                                {cat.description}
+                              </span>
+                            </span>
                           </Link>
                         ))}
                       </div>
 
-                      <Link
-                        href="/shop"
-                        className="text-link border-line mt-4 block border-t pt-3 text-sm font-semibold no-underline hover:underline"
-                      >
-                        Browse all products →
-                      </Link>
+                      <div className="border-line flex flex-col justify-between border-l pl-4">
+                        <div className="space-y-1">
+                          <p className="text-muted pb-1 text-xs font-semibold tracking-wider uppercase">
+                            By format
+                          </p>
+                          {shopMenu.formats.map((f) => (
+                            <Link
+                              key={f.href}
+                              href={f.href}
+                              onClick={() => setShopOpen(false)}
+                              className="hover:text-link block py-1.5 text-sm font-medium no-underline"
+                            >
+                              {f.label}
+                            </Link>
+                          ))}
+                        </div>
+
+                        <Link
+                          href="/shop"
+                          onClick={() => setShopOpen(false)}
+                          className="text-link border-line mt-4 block border-t pt-3 text-sm font-semibold no-underline hover:underline"
+                        >
+                          Browse all products →
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -178,8 +184,10 @@ export function Header() {
           </nav>
 
           {/* Right actions */}
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             <SearchBar />
+
+            <ThemeToggle variant="cycle" />
 
             <Link
               href="/account"
@@ -194,7 +202,7 @@ export function Header() {
               aria-label={
                 cartCount > 0 ? `${t.nav.cart} (${cartCount} items)` : t.nav.cart
               }
-              className="text-fg hover:text-link hover:bg-surface-2 relative inline-flex size-11 items-center justify-center rounded-md no-underline"
+              className="text-fg hover:text-link hover:bg-surface-2 relative inline-flex size-10 items-center justify-center rounded-md no-underline sm:size-11"
             >
               <ShoppingBag className="size-5" strokeWidth={1.75} aria-hidden />
               {cartCount > 0 && (
@@ -254,6 +262,12 @@ export function Header() {
           </div>
 
           <div className="border-line space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between gap-2 px-2 py-1">
+              <span className="text-muted text-xs font-bold tracking-wider uppercase">
+                Appearance
+              </span>
+              <ThemeToggle variant="segmented" />
+            </div>
             <Link
               href="/account"
               onClick={() => setDrawerOpen(false)}
@@ -262,15 +276,17 @@ export function Header() {
               <User className="text-link size-5" aria-hidden />
               <span>My account & library</span>
             </Link>
-            <a
-              href={whatsappLink("Hello Akwasuccess")}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:bg-surface-2 flex min-h-12 items-center gap-2.5 rounded-md px-2 font-semibold no-underline"
-            >
-              <MessageCircle className="text-link size-5" aria-hidden />
-              <span>{t.nav.chatWhatsApp}</span>
-            </a>
+            {site.whatsapp && (
+              <a
+                href={whatsappLink("Hello Akwasuccess")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:bg-surface-2 flex min-h-12 items-center gap-2.5 rounded-md px-2 font-semibold no-underline"
+              >
+                <MessageCircle className="text-link size-5" aria-hidden />
+                <span>{t.nav.chatWhatsApp}</span>
+              </a>
+            )}
           </div>
         </nav>
       </Modal>

@@ -8,7 +8,7 @@ import { DisclaimerBanner } from "@/components/ui/DisclaimerBanner";
 export const metadata: Metadata = {
   title: "Services & Consulting",
   description:
-    "Cryptocurrency, blockchain and financial education consulting, plus domestic and industrial electrical installation in Nairobi and Kenya.",
+    "Cryptocurrency, blockchain and financial education consulting, plus domestic and industrial electrical installation services.",
   alternates: { canonical: "/services" },
 };
 
@@ -63,8 +63,7 @@ export default function ServicesOverviewPage() {
               </h2>
               <p className="text-muted">
                 Safe, compliant electrical wiring, fault troubleshooting, instrumentation, and
-                automation support for homes, commercial buildings, and industrial facilities in
-                Nairobi and surrounding areas.
+                automation support for homes, commercial buildings, and industrial facilities.
               </p>
               <ul className="text-muted list-disc space-y-1.5 pl-5 text-sm">
                 <li>Domestic house wiring, distribution boards &amp; earthing</li>

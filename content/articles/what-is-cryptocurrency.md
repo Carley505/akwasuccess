@@ -1,7 +1,7 @@
 ---
 slug: what-is-cryptocurrency
 title: What Is Cryptocurrency? A Plain-English Guide for Beginners
-excerpt: Learn what cryptocurrency is, how it compares to mobile money like M-Pesa, and what you should understand before using it.
+excerpt: Learn what cryptocurrency is, how it compares to everyday digital banking and payment apps, and what you should understand before using it.
 category: crypto
 level: beginner
 featured: true
@@ -10,13 +10,13 @@ updated: "2026-10-15"
 relatedProduct: cryptocurrency-for-beginners
 keyTakeaways:
   - Cryptocurrency is digital money that runs on a shared public record called a blockchain.
-  - Unlike mobile money or bank accounts, no single company or bank controls a public blockchain.
-  - Because transactions cannot be reversed by customer care, learning security first is essential.
+  - Unlike payment apps or bank accounts, no single company or bank controls a public blockchain.
+  - Because transactions cannot be reversed by customer support, learning security first is essential.
 ---
 
 ## Digital money you already know vs. cryptocurrency
 
-If you live in Kenya or East Africa, you already use digital money every day. When you send KES with M-Pesa or a banking app, Safaricom or your bank updates its private database to move value from your account to someone else.
+Most of us already use digital money every day. When you send USD or local currency through a banking app or digital payment service, your bank or payment provider updates its private database to move value from your account to someone else.
 
 **Cryptocurrency** is also digital money, but with one big difference: there is no single company in the middle keeping the ledger. Instead, thousands of computers around the world keep the same shared record together. That shared record is called a **blockchain**.
 

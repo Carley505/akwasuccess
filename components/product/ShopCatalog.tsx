@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { SlidersHorizontal, X } from "lucide-react";
 import { shopCategories, type Category } from "@/content/categories";
@@ -9,6 +9,8 @@ import { ProductCard, type ProductCardData } from "@/components/product/ProductC
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/States";
 import { Button, LinkButton } from "@/components/ui/Button";
+import { effectivePrice } from "@/lib/pricing";
+import { formatMoney } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 
 export type ActiveFilters = {
@@ -21,7 +23,7 @@ export type ActiveFilters = {
   sort?: string;
 };
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 16;
 
 export function ShopCatalog({
   products,
@@ -32,42 +34,113 @@ export function ShopCatalog({
   activeCategory?: Category;
   initialFilters: ActiveFilters;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [filters, setFilters] = useState<ActiveFilters>(initialFilters);
+
+  useEffect(() => {
+    function syncFromUrl() {
+      const sp = new URLSearchParams(window.location.search);
+      setFilters({
+        category: sp.get("category") ?? initialFilters.category,
+        format: sp.get("format") ?? initialFilters.format,
+        level: sp.get("level") ?? initialFilters.level,
+        pricing: sp.get("pricing") ?? initialFilters.pricing,
+        maxPrice: sp.get("maxPrice") ?? initialFilters.maxPrice,
+        q: sp.get("q") ?? initialFilters.q,
+        sort: sp.get("sort") ?? initialFilters.sort,
+      });
+    }
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, [initialFilters]);
 
   function updateParam(updates: Record<string, string | undefined>) {
-    const params = new URLSearchParams();
-    const merged: Record<string, string | undefined> = { ...initialFilters, ...updates };
+    const merged: ActiveFilters = { ...filters, ...updates };
     if (activeCategory) delete merged.category;
+    const cleaned: ActiveFilters = {};
+    const params = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
-      if (v && v !== "all") params.set(k, v);
+      if (v && v !== "all") {
+        cleaned[k as keyof ActiveFilters] = v;
+        params.set(k, v);
+      }
     }
+    setFilters(cleaned);
+    setVisibleCount(PAGE_SIZE);
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    const nextUrl = qs ? `${pathname}?${qs}` : pathname;
+    window.history.replaceState(null, "", nextUrl);
   }
 
   function resetAll() {
-    router.push(activeCategory ? `/shop/${activeCategory.slug}` : "/shop");
+    setFilters({});
+    setVisibleCount(PAGE_SIZE);
+    window.history.replaceState(
+      null,
+      "",
+      activeCategory ? `/shop/${activeCategory.slug}` : "/shop",
+    );
   }
+
+  const filteredProducts = useMemo(() => {
+    const q = filters.q?.trim().toLowerCase();
+    const maxCents = filters.maxPrice ? Number(filters.maxPrice) : undefined;
+
+    const list = products.filter((p) => {
+      if (!activeCategory && filters.category && p.categorySlug !== filters.category) {
+        return false;
+      }
+      if (filters.format && filters.format !== "all" && p.type !== filters.format) {
+        return false;
+      }
+      if (filters.level && filters.level !== "all" && p.level !== filters.level) {
+        return false;
+      }
+      const price = effectivePrice(p);
+      if (filters.pricing === "free" && !(p.isFree || price === 0)) {
+        return false;
+      }
+      if (filters.pricing === "paid" && (p.isFree || price === 0)) {
+        return false;
+      }
+      if (maxCents !== undefined && !Number.isNaN(maxCents) && price > maxCents) {
+        return false;
+      }
+      if (q) {
+        const hay = `${p.title} ${p.subtitle ?? ""} ${p.categorySlug} ${p.type}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    if (filters.sort === "price-asc") {
+      return [...list].sort((a, b) => effectivePrice(a) - effectivePrice(b));
+    }
+    if (filters.sort === "price-desc") {
+      return [...list].sort((a, b) => effectivePrice(b) - effectivePrice(a));
+    }
+    return list;
+  }, [products, activeCategory, filters]);
 
   const chips: { key: keyof ActiveFilters; label: string }[] = [];
-  if (!activeCategory && initialFilters.category) {
-    const c = shopCategories.find((cat) => cat.slug === initialFilters.category);
+  if (!activeCategory && filters.category) {
+    const c = shopCategories.find((cat) => cat.slug === filters.category);
     if (c) chips.push({ key: "category", label: `Topic: ${c.shortName}` });
   }
-  if (initialFilters.format) chips.push({ key: "format", label: `Format: ${initialFilters.format}` });
-  if (initialFilters.level) chips.push({ key: "level", label: `Level: ${initialFilters.level}` });
-  if (initialFilters.pricing && initialFilters.pricing !== "all") {
-    chips.push({ key: "pricing", label: initialFilters.pricing === "free" ? "Free only" : "Paid" });
+  if (filters.format) chips.push({ key: "format", label: `Format: ${filters.format}` });
+  if (filters.level) chips.push({ key: "level", label: `Level: ${filters.level}` });
+  if (filters.pricing && filters.pricing !== "all") {
+    chips.push({ key: "pricing", label: filters.pricing === "free" ? "Free only" : "Paid" });
   }
-  if (initialFilters.maxPrice) {
-    chips.push({ key: "maxPrice", label: `Up to KES ${initialFilters.maxPrice}` });
+  if (filters.maxPrice) {
+    chips.push({ key: "maxPrice", label: `Up to ${formatMoney(Number(filters.maxPrice))}` });
   }
-  if (initialFilters.q) chips.push({ key: "q", label: `Search: "${initialFilters.q}"` });
+  if (filters.q) chips.push({ key: "q", label: `Search: "${filters.q}"` });
 
-  const visibleProducts = products.slice(0, visibleCount);
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
 
   const filterControls = (
     <div className="space-y-6">
@@ -89,7 +162,8 @@ export function ShopCatalog({
             id="shop-q"
             name="q"
             type="search"
-            defaultValue={initialFilters.q ?? ""}
+            key={filters.q ?? ""}
+            defaultValue={filters.q ?? ""}
             placeholder="Search title or topic..."
             className="border-line bg-surface min-h-11 w-full rounded-md border px-3 text-sm"
           />
@@ -110,7 +184,7 @@ export function ShopCatalog({
             <Link
               href="/shop"
               className={`flex min-h-10 items-center rounded px-2 py-1 no-underline ${
-                !activeCategory && !initialFilters.category
+                !activeCategory && !filters.category
                   ? "bg-tint text-link font-semibold"
                   : "hover:bg-surface-2"
               }`}
@@ -120,7 +194,7 @@ export function ShopCatalog({
           </li>
           {shopCategories.map((cat) => {
             const selected =
-              activeCategory?.slug === cat.slug || initialFilters.category === cat.slug;
+              activeCategory?.slug === cat.slug || filters.category === cat.slug;
             return (
               <li key={cat.slug}>
                 <Link
@@ -144,7 +218,7 @@ export function ShopCatalog({
         </label>
         <select
           id="filter-format"
-          value={initialFilters.format ?? "all"}
+          value={filters.format ?? "all"}
           onChange={(e) => updateParam({ format: e.target.value })}
           className="border-line bg-surface min-h-11 w-full rounded-md border px-3 text-sm"
         >
@@ -164,7 +238,7 @@ export function ShopCatalog({
         </label>
         <select
           id="filter-level"
-          value={initialFilters.level ?? "all"}
+          value={filters.level ?? "all"}
           onChange={(e) => updateParam({ level: e.target.value })}
           className="border-line bg-surface min-h-11 w-full rounded-md border px-3 text-sm"
         >
@@ -182,7 +256,7 @@ export function ShopCatalog({
         </label>
         <select
           id="filter-pricing"
-          value={initialFilters.pricing ?? "all"}
+          value={filters.pricing ?? "all"}
           onChange={(e) => updateParam({ pricing: e.target.value })}
           className="border-line bg-surface min-h-11 w-full rounded-md border px-3 text-sm"
         >
@@ -208,15 +282,15 @@ export function ShopCatalog({
       </aside>
 
       {/* Main catalog column */}
-      <div className="lg:col-span-9">
+      <div className="min-w-0 lg:col-span-9">
         {/* Toolbar: count + mobile Filter button + Sort select */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-muted text-sm font-medium" aria-live="polite">
-            Showing <strong>{products.length}</strong>{" "}
-            {products.length === 1 ? "resource" : "resources"}
+            Showing <strong>{filteredProducts.length}</strong>{" "}
+            {filteredProducts.length === 1 ? "resource" : "resources"}
           </p>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-2.5">
             <button
               type="button"
               onClick={() => setSheetOpen(true)}
@@ -231,9 +305,9 @@ export function ShopCatalog({
             </label>
             <select
               id="shop-sort"
-              value={initialFilters.sort ?? "popular"}
+              value={filters.sort ?? "popular"}
               onChange={(e) => updateParam({ sort: e.target.value })}
-              className="border-line bg-surface min-h-11 rounded-md border px-3 text-sm font-medium"
+              className="border-line bg-surface min-h-11 min-w-0 flex-1 rounded-md border px-3 text-sm font-medium sm:flex-initial"
             >
               <option value="popular">Sort: Popular</option>
               <option value="newest">Sort: Newest</option>
@@ -267,7 +341,7 @@ export function ShopCatalog({
           </div>
         )}
 
-        {products.length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <EmptyState
             title="No matching eBooks or courses"
             description="Try clearing a filter, searching a broader keyword, or exploring our free learning hub."
@@ -288,13 +362,13 @@ export function ShopCatalog({
               ))}
             </div>
 
-            {visibleCount < products.length && (
+            {visibleCount < filteredProducts.length && (
               <div className="mt-8 text-center">
                 <Button
                   variant="secondary"
                   onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
                 >
-                  {t.actions.loadMore} ({products.length - visibleCount} more)
+                  {t.actions.loadMore} ({filteredProducts.length - visibleCount} more)
                 </Button>
               </div>
             )}

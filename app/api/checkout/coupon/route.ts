@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema as s } from "@/lib/db";
 import { applyCoupon } from "@/lib/pricing";
+import { validateWooCoupon } from "@/lib/woocommerce";
 
 const schema = z.object({
   code: z.string().min(1).max(40),
-  subtotalKes: z.number().int().min(0),
+  subtotalCents: z.number().int().min(0),
 });
 
 export async function POST(req: NextRequest) {
@@ -15,17 +16,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Please enter a coupon code." }, { status: 400 });
   }
 
-  const db = await getDb();
   const code = parsed.data.code.toUpperCase().trim();
+  const wooRes = await validateWooCoupon(code, parsed.data.subtotalCents);
+  if (wooRes.found) {
+    if (!wooRes.ok) {
+      return NextResponse.json({ error: wooRes.reason }, { status: 400 });
+    }
+    return NextResponse.json({
+      code: wooRes.code,
+      discountCents: wooRes.discountCents,
+    });
+  }
+
+  const db = await getDb();
   const [coupon] = await db.select().from(s.coupons).where(eq(s.coupons.code, code));
 
-  const res = applyCoupon(coupon, parsed.data.subtotalKes);
+  const res = applyCoupon(coupon, parsed.data.subtotalCents);
   if (!res.ok) {
     return NextResponse.json({ error: res.reason }, { status: 400 });
   }
 
   return NextResponse.json({
     code,
-    discountKes: res.discountKes,
+    discountCents: res.discountCents,
   });
 }

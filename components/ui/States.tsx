@@ -3,7 +3,7 @@ import { AlertTriangle, Inbox, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("bg-surface-2 animate-pulse rounded-md", className)} aria-hidden />;
+  return <div className={cn("bg-line/60 animate-pulse rounded-md", className)} aria-hidden />;
 }
 
 export function EmptyState({

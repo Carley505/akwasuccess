@@ -91,15 +91,14 @@ async function main() {
     assert(prodHtml.includes("application/ld+json"), "Product page has JSON-LD schema");
     console.log("5. Product detail page verified.");
 
-    // 5. End-to-end Guest Checkout + M-Pesa STK Push + Idempotent Settlement + Signed PDF Download
+    // 5. End-to-end Guest Checkout + USD Card Payment + Idempotent Settlement + Signed PDF Download
     const checkoutRes = await fetch(`${base}/api/checkout`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         email: "e2e-buyer@example.com",
-        phone: "0712 345 678",
         name: "E2E Buyer",
-        method: "mpesa",
+        method: "card",
         productIds: [cryptoProd.id],
         couponCode: "SAMPLE10",
         marketingConsent: true,
@@ -112,13 +111,15 @@ async function main() {
     };
     assert(checkoutRes.ok && checkoutData.paymentId && checkoutData.orderId, "Checkout initiated");
 
-    // Simulate M-Pesa PIN approval
-    const simRes = await fetch(`${base}/api/payments/${checkoutData.paymentId}/status`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "succeed" }),
-    });
-    assert(simRes.ok, "M-Pesa sandbox approval succeeded");
+    // Confirm sandbox card payment settlement (if not already auto-settled)
+    if (checkoutData.status !== "succeeded") {
+      const simRes = await fetch(`${base}/api/payments/${checkoutData.paymentId}/status`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "succeed" }),
+      });
+      assert(simRes.ok, "Card sandbox settlement succeeded");
+    }
 
     // Verify order confirmation page contains signed download URL
     const orderHtml = await (
@@ -137,7 +138,7 @@ async function main() {
     const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
     assert(pdfBytes.byteLength > 500, "Downloaded PDF has valid byte length");
     console.log(
-      `6. End-to-end M-Pesa checkout + signed watermarked PDF download verified (${pdfBytes.byteLength} bytes).`,
+      `6. End-to-end USD card checkout + signed watermarked PDF download verified (${pdfBytes.byteLength} bytes).`,
     );
 
     console.log("ALL ACCEPTANCE CHECKS PASSED.");

@@ -70,7 +70,7 @@ export function SearchBar() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Search eBooks, courses and articles"
-        className="text-fg hover:text-link hover:bg-surface-2 inline-flex size-11 items-center justify-center rounded-md"
+        className="text-fg hover:text-link hover:bg-surface-2 inline-flex size-10 items-center justify-center rounded-md sm:size-11"
       >
         <Search className="size-5" strokeWidth={1.75} aria-hidden />
       </button>

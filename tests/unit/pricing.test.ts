@@ -11,11 +11,11 @@ import {
 
 describe("Pricing & coupon engine", () => {
   it("computes effectivePrice and sale status accurately", () => {
-    expect(effectivePrice({ priceKes: 1500, salePriceKes: 1200, isFree: false })).toBe(1200);
-    expect(isOnSale({ priceKes: 1500, salePriceKes: 1200, isFree: false })).toBe(true);
-    expect(effectivePrice({ priceKes: 1500, salePriceKes: null, isFree: true })).toBe(0);
-    expect(isPurchasable({ priceKes: 0, salePriceKes: null, isFree: false })).toBe(false);
-    expect(isPurchasable({ priceKes: 1000, salePriceKes: null, isFree: false })).toBe(true);
+    expect(effectivePrice({ priceCents: 1500, salePriceCents: 1200, isFree: false })).toBe(1200);
+    expect(isOnSale({ priceCents: 1500, salePriceCents: 1200, isFree: false })).toBe(true);
+    expect(effectivePrice({ priceCents: 1500, salePriceCents: null, isFree: true })).toBe(0);
+    expect(isPurchasable({ priceCents: 0, salePriceCents: null, isFree: false })).toBe(false);
+    expect(isPurchasable({ priceCents: 1000, salePriceCents: null, isFree: false })).toBe(true);
   });
 
   it("validates percent and fixed coupons and caps discount at subtotal", () => {
@@ -24,15 +24,15 @@ describe("Pricing & coupon engine", () => {
       type: "percent",
       value: 10,
       active: true,
-      minSubtotalKes: 500,
+      minSubtotalCents: 500,
       maxRedemptions: 10,
       redemptions: 2,
       expiresAt: null,
     };
-    expect(applyCoupon(baseCoupon, 1500)).toEqual({ ok: true, discountKes: 150 });
+    expect(applyCoupon(baseCoupon, 1500)).toEqual({ ok: true, discountCents: 150 });
     expect(applyCoupon(baseCoupon, 300)).toEqual({
       ok: false,
-      reason: "This code needs a minimum order of KES 500.",
+      reason: "This code needs a minimum order of $5.00.",
     });
 
     const expired: CouponRule = {
@@ -44,9 +44,9 @@ describe("Pricing & coupon engine", () => {
 
   it("computes totals and honest bundle savings", () => {
     expect(computeTotals([1200, 800], 200)).toEqual({
-      subtotalKes: 2000,
-      discountKes: 200,
-      totalKes: 1800,
+      subtotalCents: 2000,
+      discountCents: 200,
+      totalCents: 1800,
     });
     expect(bundleSavings(2200, [1500, 1000])).toEqual({
       separate: 2500,

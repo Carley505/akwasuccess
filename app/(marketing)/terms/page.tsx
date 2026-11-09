@@ -58,7 +58,8 @@ export default function TermsPage() {
 
           <h2>5. Governing law</h2>
           <p>
-            These terms are governed by the laws of the Republic of Kenya. Any questions may be sent
+            These terms are governed by applicable international commercial and consumer protection
+            laws. Any questions may be sent
             to <a href={`mailto:${site.email}`}>{site.email}</a>.
           </p>
         </div>

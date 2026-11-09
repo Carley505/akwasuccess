@@ -5,131 +5,45 @@ import { getDb, schema as s } from "@/lib/db";
 import { findOrCreateUser, issueMagicLoginToken } from "@/lib/auth";
 import { createSignedDownloadToken } from "@/lib/storage";
 import { sendOrderReceiptEmail } from "@/lib/email";
+import { markWooOrderPaid } from "@/lib/woocommerce";
 import { absoluteUrl } from "@/lib/utils";
 
-export type StkPushResult = {
-  ok: boolean;
-  provider: "mpesa" | "mock";
-  providerRef: string;
-  message: string;
-};
-
 /**
- * Initiates a Safaricom Daraja STK Push when MPESA_CONSUMER_KEY is set,
- * or falls back to the built-in sandbox simulator so local/staging environments
- * can test the full 60–90s polling, success, wrong-PIN, and timeout paths.
+ * True when the local payment sandbox may be used. Without live card keys the
+ * sandbox instantly "approves" payments, so it must NEVER be reachable in
+ * production unless the owner explicitly opts in with ALLOW_PAYMENT_SANDBOX=true.
  */
-export async function initiateMpesaStkPush(opts: {
-  reference: string;
-  phoneNormalized: string; // 2547xxxxxxxx
-  amountKes: number;
-  orderNumber: string;
-}): Promise<StkPushResult> {
-  const key = process.env.MPESA_CONSUMER_KEY;
-  const secret = process.env.MPESA_CONSUMER_SECRET;
-  const passkey = process.env.MPESA_PASSKEY;
-  const shortcode = process.env.MPESA_SHORTCODE || "174379";
-
-  if (!key || !secret || !passkey) {
-    return {
-      ok: true,
-      provider: "mock",
-      providerRef: `ws_CO_${Date.now()}_${opts.reference.slice(-6)}`,
-      message:
-        "Sandbox mode: Check your phone and enter your M-Pesa PIN (or use the Sandbox Simulator controls on screen).",
-    };
-  }
-
-  const baseUrl =
-    process.env.MPESA_ENV === "production"
-      ? "https://api.safaricom.co.ke"
-      : "https://sandbox.safaricom.co.ke";
-
-  const auth = Buffer.from(`${key}:${secret}`).toString("base64");
-  const tokenRes = await fetch(
-    `${baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
-    { headers: { authorization: `Basic ${auth}` } },
-  );
-  if (!tokenRes.ok) {
-    return {
-      ok: false,
-      provider: "mpesa",
-      providerRef: "",
-      message: "Could not connect to M-Pesa right now. Please try again.",
-    };
-  }
-  const { access_token } = (await tokenRes.json()) as { access_token: string };
-
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:TZ.]/g, "")
-    .slice(0, 14);
-  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString("base64");
-  const callbackUrl =
-    process.env.MPESA_CALLBACK_URL || absoluteUrl("/api/webhooks/mpesa");
-
-  const stkRes = await fetch(`${baseUrl}/mpesa/stkpush/v1/processrequest`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${access_token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      BusinessShortCode: shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: Math.max(1, Math.round(opts.amountKes)),
-      PartyA: opts.phoneNormalized,
-      PartyB: shortcode,
-      PhoneNumber: opts.phoneNormalized,
-      CallBackURL: callbackUrl,
-      AccountReference: `AKWA-${opts.orderNumber}`,
-      TransactionDesc: `Akwasuccess Order ${opts.orderNumber}`,
-    }),
-  });
-
-  const stkData = (await stkRes.json()) as {
-    ResponseCode?: string;
-    CheckoutRequestID?: string;
-    CustomerMessage?: string;
-    errorMessage?: string;
-  };
-
-  if (!stkRes.ok || stkData.ResponseCode !== "0" || !stkData.CheckoutRequestID) {
-    return {
-      ok: false,
-      provider: "mpesa",
-      providerRef: "",
-      message:
-        stkData.CustomerMessage ||
-        stkData.errorMessage ||
-        "M-Pesa could not send the PIN prompt. Please check your number and retry.",
-    };
-  }
-
-  return {
-    ok: true,
-    provider: "mpesa",
-    providerRef: stkData.CheckoutRequestID,
-    message: stkData.CustomerMessage || "Check your phone and enter your M-Pesa PIN.",
-  };
+export function isPaymentSandboxAllowed() {
+  return process.env.NODE_ENV !== "production" || process.env.ALLOW_PAYMENT_SANDBOX === "true";
 }
 
 /**
- * Initiates a Paystack card (or M-Pesa) checkout session when PAYSTACK_SECRET_KEY
- * is set, or returns a local sandbox redirect URL.
+ * Initiates a Paystack card checkout in USD when PAYSTACK_SECRET_KEY is set
+ * (returning both `accessCode` for the seamless in-site Paystack inline popup
+ * and `authorizationUrl` fallback), or returns a local sandbox mode when live
+ * keys have not been added yet.
  */
 export async function initiateCardPayment(opts: {
   reference: string;
   email: string;
-  amountKes: number;
+  amountCents: number;
   orderId: string;
-}): Promise<{ ok: boolean; provider: "paystack" | "mock"; authorizationUrl: string }> {
+  wooOrderId?: number | null;
+}): Promise<{
+  ok: boolean;
+  provider: "paystack" | "mock";
+  authorizationUrl: string;
+  accessCode?: string;
+  publicKey?: string;
+}> {
   const secret = process.env.PAYSTACK_SECRET_KEY;
+  const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
   const callbackUrl = absoluteUrl(`/checkout/order/${opts.orderId}`);
 
   if (!secret) {
+    if (!isPaymentSandboxAllowed()) {
+      return { ok: false, provider: "mock", authorizationUrl: "" };
+    }
     return {
       ok: true,
       provider: "mock",
@@ -145,15 +59,20 @@ export async function initiateCardPayment(opts: {
     },
     body: JSON.stringify({
       email: opts.email,
-      amount: Math.round(opts.amountKes * 100), // KES cents
-      currency: "KES",
+      amount: Math.round(opts.amountCents), // USD, in cents
+      currency: "USD",
       reference: opts.reference,
       callback_url: callbackUrl,
+      metadata: {
+        order_id: opts.wooOrderId ?? opts.orderId,
+        akwa_order_id: opts.orderId,
+        woo_order_id: opts.wooOrderId ?? null,
+      },
     }),
   });
   const data = (await res.json()) as {
     status?: boolean;
-    data?: { authorization_url?: string };
+    data?: { authorization_url?: string; access_code?: string; reference?: string };
   };
   if (!res.ok || !data.status || !data.data?.authorization_url) {
     return { ok: false, provider: "paystack", authorizationUrl: "" };
@@ -162,24 +81,95 @@ export async function initiateCardPayment(opts: {
     ok: true,
     provider: "paystack",
     authorizationUrl: data.data.authorization_url,
+    accessCode: data.data.access_code,
+    publicKey: publicKey || undefined,
   };
+}
+
+export async function verifyPaystackTransaction(reference: string): Promise<{
+  ok: boolean;
+  status: string;
+  amountCents: number;
+  currency: string;
+  transactionId?: string;
+  raw?: unknown;
+}> {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret || !reference) {
+    return { ok: false, status: "unconfigured", amountCents: 0, currency: "" };
+  }
+  try {
+    const res = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      {
+        headers: {
+          authorization: `Bearer ${secret}`,
+          "content-type": "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+    const json = (await res.json()) as {
+      status?: boolean;
+      data?: {
+        id?: number | string;
+        status?: string;
+        amount?: number;
+        currency?: string;
+        reference?: string;
+      };
+    };
+    const d = json.data;
+    if (!res.ok || !json.status || !d) {
+      return { ok: false, status: "verify_failed", amountCents: 0, currency: "", raw: json };
+    }
+    return {
+      ok: d.status === "success",
+      status: d.status ?? "unknown",
+      amountCents: Number(d.amount ?? 0),
+      currency: String(d.currency ?? "").toUpperCase(),
+      transactionId: d.id ? String(d.id) : reference,
+      raw: json,
+    };
+  } catch {
+    return { ok: false, status: "network_error", amountCents: 0, currency: "" };
+  }
 }
 
 export function verifyPaystackSignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret || !signature) return false;
   const expected = crypto.createHmac("sha512", secret).update(rawBody).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 /**
- * Idempotently settles a payment, marks the order paid, grants entitlements
- * (including expanding bundle items), and emails the receipt + download links.
+ * Verifies that a Paystack payment amount and currency match the expected USD
+ * cents on the order.
+ */
+export function isPaystackAmountValid(
+  expectedAmountCents: number,
+  actualAmountCents: number,
+  actualCurrency: string,
+): boolean {
+  return (
+    actualCurrency.toUpperCase() === "USD" &&
+    Math.round(actualAmountCents) === Math.round(expectedAmountCents)
+  );
+}
+
+/**
+ * Idempotently settles a payment, marks the local & WooCommerce orders paid,
+ * grants entitlements (including expanding bundle items), and emails the
+ * receipt + 4-hour timed download links.
  */
 export async function settleOrderPayment(opts: {
   paymentId: string;
   dedupeKey: string;
-  provider: "mpesa" | "paystack" | "mock";
+  provider: "paystack" | "mock";
   outcome: "succeeded" | "failed" | "timeout";
   receiptNumber?: string;
   failureReason?: string;
@@ -223,11 +213,13 @@ export async function settleOrderPayment(opts: {
     return { alreadyProcessed: false, status: opts.outcome };
   }
 
+  const receiptNumber = opts.receiptNumber ?? `AKWA${Date.now().toString().slice(-6)}`;
+
   await db
     .update(s.payments)
     .set({
       status: "succeeded",
-      receiptNumber: opts.receiptNumber ?? `AKWA${Date.now().toString().slice(-6)}`,
+      receiptNumber,
       completedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -243,11 +235,25 @@ export async function settleOrderPayment(opts: {
     marketingConsent: order.marketingConsent,
   });
 
+  // Mark the authoritative WooCommerce order paid & completed so Woo grants download permissions
+  let wooOrderKey = order.wooOrderKey;
+  if (order.wooOrderId) {
+    const updatedWoo = await markWooOrderPaid({
+      wooOrderId: order.wooOrderId,
+      transactionId: receiptNumber,
+      reference: payment.reference,
+    });
+    if (updatedWoo?.order_key) {
+      wooOrderKey = updatedWoo.order_key;
+    }
+  }
+
   await db
     .update(s.orders)
     .set({
       userId: user.id,
       status: "paid",
+      wooOrderKey,
       paidAt: new Date(),
       updatedAt: new Date(),
     })
@@ -273,7 +279,7 @@ export async function settleOrderPayment(opts: {
     }
   }
 
-  const emailItems: { title: string; downloadUrl?: string }[] = [];
+  const emailItems: { title: string; downloadUrl?: string; accessUrl?: string }[] = [];
 
   for (const productId of entitlementProductIds) {
     await db
@@ -312,7 +318,11 @@ export async function settleOrderPayment(opts: {
       downloadUrl = absoluteUrl(`/api/download/${token}`);
     }
     if (prod) {
-      emailItems.push({ title: prod.title, downloadUrl });
+      const accessUrl =
+        prod.type === "course" || prod.type === "tutorial"
+          ? absoluteUrl(`/account/courses/${prod.slug}?order=${order.id}`)
+          : undefined;
+      emailItems.push({ title: prod.title, downloadUrl, accessUrl });
     }
   }
 
@@ -322,7 +332,7 @@ export async function settleOrderPayment(opts: {
     await sendOrderReceiptEmail({
       email: user.email,
       orderNumber: order.number,
-      totalKes: order.totalKes,
+      totalCents: order.totalCents,
       items: emailItems,
       magicLinkUrl,
     });

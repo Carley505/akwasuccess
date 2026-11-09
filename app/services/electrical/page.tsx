@@ -7,9 +7,9 @@ import { ElectricalQuoteForm } from "@/components/services/ElectricalQuoteForm";
 import { JsonLd } from "@/components/seo/JsonLd";
 
 export const metadata: Metadata = {
-  title: "Domestic & Industrial Electrical Installation in Nairobi",
+  title: "Domestic & Industrial Electrical Installation Services",
   description:
-    "Domestic and industrial electrical installation, fault troubleshooting, instrumentation, and PLC automation support in Nairobi and surrounding areas.",
+    "Domestic and industrial electrical installation, fault troubleshooting, instrumentation, and PLC automation support.",
   alternates: { canonical: "/services/electrical" },
 };
 
@@ -77,8 +77,8 @@ export default function ElectricalServicesPage() {
                 <h2 className="text-xl font-bold">Safety, compliance &amp; service area</h2>
               </div>
               <p className="text-muted text-sm">
-                <strong>Service area:</strong> Nairobi and surrounding counties (Kiambu, Machakos,
-                Kajiado; industrial callouts across Kenya by arrangement —{" "}
+                <strong>Service area:</strong> On-site domestic, commercial, and industrial
+                installations and remote technical consultation by arrangement (
                 <em>TODO: owner to confirm exact coverage and warranty terms</em>).
               </p>
               <p className="text-muted text-sm">
@@ -120,16 +120,11 @@ export default function ElectricalServicesPage() {
       <JsonLd
         data={{
           "@context": "https://schema.org",
-          "@type": "LocalBusiness",
+          "@type": "ProfessionalService",
           name: `${site.name} Electrical & Automation Services`,
           url: `${site.url}/services/electrical`,
           email: site.email,
-          areaServed: "Nairobi, Kenya",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: "Nairobi",
-            addressCountry: "KE",
-          },
+          areaServed: "Worldwide",
         }}
       />
     </>

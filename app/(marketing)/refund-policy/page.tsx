@@ -41,7 +41,7 @@ export default function RefundPolicyPage() {
             gladly issue a full refund or replacement within <strong>7 days of purchase</strong> if:
           </p>
           <ul>
-            <li>You were charged twice by mistake (for example, a duplicate M-Pesa or card payment).</li>
+            <li>You were charged twice by mistake (for example, a duplicate card payment).</li>
             <li>The file is corrupted or cannot be opened and our support team cannot fix it for you.</li>
             <li>You have not yet downloaded or accessed the digital product and ask to cancel within 7 days.</li>
           </ul>
@@ -61,7 +61,8 @@ export default function RefundPolicyPage() {
           <h2>5. How to request help or a refund</h2>
           <p>
             Email <a href={`mailto:${site.email}`}>{site.email}</a> or message us via the{" "}
-            <Link href="/contact">Contact page</Link> with your Order Number or M-Pesa receipt code.
+            <Link href="/contact">Contact page</Link> with your Order Number or payment receipt
+            reference.
             We respond within one working day.
           </p>
         </div>

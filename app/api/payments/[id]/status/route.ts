@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema as s } from "@/lib/db";
-import { settleOrderPayment } from "@/lib/payments";
+import { isPaymentSandboxAllowed, settleOrderPayment } from "@/lib/payments";
 
 type Params = Promise<{ id: string }>;
 
@@ -32,12 +32,16 @@ const simSchema = z.object({
 });
 
 /**
- * Sandbox simulation endpoint so staging & E2E tests can deterministically
- * trigger M-Pesa PIN success, wrong PIN failure, or 60–90s timeout.
- * Only permitted when payment.provider === "mock".
+ * Local sandbox endpoint so development, staging and E2E tests can
+ * deterministically settle a test card payment (success, failure or timeout).
+ * Only permitted when payment.provider === "mock" AND the sandbox is allowed
+ * (never in production unless ALLOW_PAYMENT_SANDBOX=true).
  */
 export async function POST(req: NextRequest, { params }: { params: Params }) {
   const { id } = await params;
+  if (!isPaymentSandboxAllowed()) {
+    return NextResponse.json({ error: "Simulation not available" }, { status: 403 });
+  }
   const parsed = simSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -54,9 +58,9 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
     action === "succeed" ? "succeeded" : action === "timeout" ? "timeout" : "failed";
   const reason =
     action === "fail"
-      ? "The M-Pesa PIN entered was incorrect or the prompt was cancelled."
+      ? "The card payment was declined or cancelled."
       : action === "timeout"
-        ? "The M-Pesa STK Push timed out before a PIN was entered."
+        ? "The card payment timed out before it was completed."
         : undefined;
 
   await settleOrderPayment({

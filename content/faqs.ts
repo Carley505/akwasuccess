@@ -7,12 +7,12 @@ export type FaqItem = {
 export const homeFaqs: FaqItem[] = [
   {
     q: "How do I receive my eBook after paying?",
-    a: "As soon as your M-Pesa or card payment is confirmed, your download link appears on the order confirmation page and is also emailed to you within 60 seconds. You can re-download your books anytime from your Account Library.",
+    a: "As soon as your card payment is confirmed, your download link appears on the order confirmation page and is also emailed to you within 60 seconds. You can re-download your books anytime from your Account Library.",
     category: "delivery",
   },
   {
-    q: "Can I pay with M-Pesa, or what if I do not have M-Pesa?",
-    a: "Yes. Choose M-Pesa at checkout, enter your Safaricom number, and enter your M-Pesa PIN when the prompt appears on your phone. If you live outside Kenya or prefer another method, you can pay securely with a Visa or Mastercard debit or credit card.",
+    q: "What currency and payment methods do you accept?",
+    a: "All prices are listed and charged in US dollars (USD). You can pay securely from anywhere in the world using any Visa or Mastercard debit or credit card.",
     category: "payments",
   },
   {
@@ -44,7 +44,7 @@ export const productDefaultFaqs: FaqItem[] = [
   },
   {
     q: "How fast is delivery?",
-    a: "Instant. As soon as your M-Pesa STK Push or card payment completes, your secure download link unlocks on screen and is sent to your email.",
+    a: "Instant. As soon as your card payment completes, your secure download link unlocks on screen and is sent to your email.",
   },
   {
     q: "Do I get future updates for free?",

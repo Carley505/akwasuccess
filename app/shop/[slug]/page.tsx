@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
-import { getCategory } from "@/content/categories";
+import { getCategory, shopCategories } from "@/content/categories";
+import { seedProducts } from "@/content/products";
+import { sampleBundle } from "@/content/sample-data";
 import { productDefaultFaqs } from "@/content/faqs";
 import { getPath } from "@/content/paths";
 import { isSampleDataVisible } from "@/content/site";
@@ -15,7 +17,7 @@ import { GuaranteeBadge, PaymentBadges } from "@/components/ui/Trust";
 import { DisclaimerBanner } from "@/components/ui/DisclaimerBanner";
 import { Accordion } from "@/components/ui/Accordion";
 import { Tabs } from "@/components/ui/Tabs";
-import { ShopCatalog, type ActiveFilters } from "@/components/product/ShopCatalog";
+import { ShopCatalog } from "@/components/product/ShopCatalog";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductBuyActions } from "@/components/product/ProductBuyActions";
 import { ProductCard } from "@/components/product/ProductCard";
@@ -23,15 +25,18 @@ import { ReviewForm } from "@/components/product/ReviewForm";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getProductBySlug, queryProducts } from "@/lib/db/queries";
 import { bundleSavings, effectivePrice, isOnSale, isPurchasable } from "@/lib/pricing";
-import { absoluteUrl, formatDate, formatKes } from "@/lib/utils";
+import { absoluteUrl, formatDate, formatMoney } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 
-type Params = Promise<{ slug: string }>;
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-function single(val: string | string[] | undefined): string | undefined {
-  return Array.isArray(val) ? val[0] : val;
+export function generateStaticParams() {
+  return [
+    ...shopCategories.map((c) => ({ slug: c.slug })),
+    ...seedProducts.map((p) => ({ slug: p.slug })),
+    { slug: sampleBundle.slug },
+  ];
 }
+
+type Params = Promise<{ slug: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
@@ -56,10 +61,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function ShopCategoryOrProductPage({
   params,
-  searchParams,
 }: {
   params: Params;
-  searchParams: SearchParams;
 }) {
   const { slug } = await params;
 
@@ -69,23 +72,8 @@ export default async function ShopCategoryOrProductPage({
     if (category.slug === "services") {
       redirect("/services");
     }
-    const sp = await searchParams;
-    const activeFilters: ActiveFilters = {
-      format: single(sp.format),
-      level: single(sp.level),
-      pricing: single(sp.pricing),
-      maxPrice: single(sp.maxPrice),
-      q: single(sp.q),
-      sort: single(sp.sort),
-    };
     const { items } = await queryProducts({
       category: category.slug,
-      format: activeFilters.format,
-      level: activeFilters.level as "beginner" | "intermediate" | "advanced" | undefined,
-      pricing: activeFilters.pricing as "all" | "free" | "paid" | undefined,
-      maxPrice: activeFilters.maxPrice ? Number(activeFilters.maxPrice) : undefined,
-      q: activeFilters.q,
-      sort: activeFilters.sort as "popular" | "newest" | "price-asc" | "price-desc" | undefined,
     });
 
     return (
@@ -113,7 +101,7 @@ export default async function ShopCategoryOrProductPage({
           <ShopCatalog
             products={items}
             activeCategory={category}
-            initialFilters={activeFilters}
+            initialFilters={{}}
           />
           {category.disclaimer && (
             <div className="mt-10">
@@ -134,8 +122,8 @@ export default async function ShopCategoryOrProductPage({
   const hideSamplePrice = product.isSample && !isSampleDataVisible;
   const displayProduct = {
     ...product,
-    priceKes: hideSamplePrice ? 0 : product.priceKes,
-    salePriceKes: hideSamplePrice ? null : product.salePriceKes,
+    priceCents: hideSamplePrice ? 0 : product.priceCents,
+    salePriceCents: hideSamplePrice ? null : product.salePriceCents,
   };
 
   const price = effectivePrice(displayProduct);
@@ -223,8 +211,8 @@ export default async function ShopCategoryOrProductPage({
             />
           </div>
 
-          <div className="lg:sticky lg:top-24 lg:col-span-7">
-            <div className="card @container space-y-5 p-6 md:p-8">
+          <div className="min-w-0 lg:sticky lg:top-24 lg:col-span-7">
+            <div className="card @container space-y-5 p-4 sm:p-6 md:p-8">
               <div className="flex flex-wrap items-center gap-2">
                 {prodCategory && <Badge tone="green">{prodCategory.name}</Badge>}
                 <Badge tone="outline-gold">{typeLabel[product.type] ?? "eBook"}</Badge>
@@ -240,17 +228,17 @@ export default async function ShopCategoryOrProductPage({
               <div className="border-line flex flex-wrap items-baseline justify-between gap-3 border-y py-4">
                 <div>
                   <PriceTag
-                    amountKes={price}
-                    originalKes={onSale ? displayProduct.priceKes : null}
+                    amountCents={price}
+                    originalCents={onSale ? displayProduct.priceCents : null}
                     isFree={displayProduct.isFree}
                     comingSoon={!canBuy}
                     size="lg"
                   />
                   {savingsInfo && savingsInfo.savings > 0 && (
                     <p className="text-link mt-1 text-xs font-semibold">
-                      Transparent bundle savings: save {formatKes(savingsInfo.savings)} (
+                      Transparent bundle savings: save {formatMoney(savingsInfo.savings)} (
                       {savingsInfo.percent}% vs buying separately at{" "}
-                      {formatKes(savingsInfo.separate)})
+                      {formatMoney(savingsInfo.separate)})
                     </p>
                   )}
                 </div>
@@ -266,8 +254,8 @@ export default async function ShopCategoryOrProductPage({
                   title: product.title,
                   type: product.type,
                   categorySlug: product.categorySlug,
-                  priceKes: displayProduct.priceKes,
-                  salePriceKes: displayProduct.salePriceKes,
+                  priceCents: displayProduct.priceCents,
+                  salePriceCents: displayProduct.salePriceCents,
                   isFree: displayProduct.isFree,
                   sampleFileKey: product.sampleFileKey,
                 }}
@@ -435,7 +423,7 @@ export default async function ShopCategoryOrProductPage({
                     <p className="text-muted">
                       Akwasuccess creates practical, beginner-friendly educational resources on
                       personal finance, cryptocurrency safety, electrical and automation
-                      technologies, and personal wellbeing from Nairobi, Kenya. Every guide focuses
+                      technologies, and personal wellbeing for learners worldwide. Every guide focuses
                       on clarity, safety, and honest foundations.
                     </p>
                     <Link
@@ -542,8 +530,8 @@ export default async function ShopCategoryOrProductPage({
           brand: { "@type": "Brand", name: "Akwasuccess" },
           offers: {
             "@type": "Offer",
-            priceCurrency: "KES",
-            price: price,
+            priceCurrency: "USD",
+            price: (price / 100).toFixed(2),
             availability: canBuy
               ? "https://schema.org/InStock"
               : "https://schema.org/PreOrder",

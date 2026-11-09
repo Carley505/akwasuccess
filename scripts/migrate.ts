@@ -2,7 +2,7 @@ import path from "node:path";
 import { openDb } from "./db";
 
 async function main() {
-  const { db, close, kind } = await openDb();
+  const { db, close, kind } = await openDb(true);
   const folder = path.join(process.cwd(), "drizzle");
   if (kind === "pglite") {
     const { migrate } = await import("drizzle-orm/pglite/migrator");

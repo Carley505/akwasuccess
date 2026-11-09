@@ -26,8 +26,8 @@ export function Badge({
         tone === "green" && "bg-tint text-link",
         tone === "gold" && "bg-tint-gold text-gold-text",
         tone === "outline-gold" && "border-gold-500 text-gold-text border",
-        tone === "sale" && "bg-danger text-white",
-        tone === "info" && "bg-info text-white",
+        tone === "sale" && "bg-danger-solid text-white",
+        tone === "info" && "bg-info-solid text-white",
         className,
       )}
     >

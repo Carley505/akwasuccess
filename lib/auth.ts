@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema as s } from "@/lib/db";
 
 const SESSION_COOKIE = "akwa_session";
@@ -66,7 +66,24 @@ export async function getSessionUser(): Promise<s.User | null> {
   if (!session) return null;
   const db = await getDb();
   const [user] = await db.select().from(s.users).where(eq(s.users.id, session.userId));
-  return user ?? null;
+  if (user) return user;
+  return findOrCreateUser({ email: session.email });
+}
+
+const DEFAULT_ADMIN_EMAILS = [
+  "callistusngeywa001@gmail.com",
+  "callistusngeywa@gmail.com",
+  "owner@akwasuccess.com",
+];
+
+export function isAdminEmail(email: string): boolean {
+  const clean = email.toLowerCase().trim();
+  const configured = (process.env.ADMIN_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.toLowerCase().trim())
+    .filter(Boolean);
+  const allowed = new Set([...DEFAULT_ADMIN_EMAILS, ...configured]);
+  return allowed.has(clean);
 }
 
 export async function findOrCreateUser(opts: {
@@ -77,8 +94,7 @@ export async function findOrCreateUser(opts: {
 }): Promise<s.User> {
   const db = await getDb();
   const cleanEmail = opts.email.toLowerCase().trim();
-  const adminEmail = (process.env.ADMIN_EMAIL ?? "owner@akwasuccess.com").toLowerCase().trim();
-  const role: "customer" | "admin" = cleanEmail === adminEmail ? "admin" : "customer";
+  const role: "customer" | "admin" = isAdminEmail(cleanEmail) ? "admin" : "customer";
 
   const [existing] = await db.select().from(s.users).where(eq(s.users.email, cleanEmail));
   if (existing) {
@@ -115,12 +131,22 @@ function sha256(input: string) {
 
 export async function issueMagicLoginToken(email: string, redirectTo = "/account") {
   const db = await getDb();
-  const rawToken = crypto.randomBytes(24).toString("hex");
+  const cleanEmail = email.toLowerCase().trim();
+  const rawToken = await new SignJWT({
+    purpose: "magic-login",
+    email: cleanEmail,
+    redirectTo,
+    nonce: crypto.randomBytes(8).toString("hex"),
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("30m")
+    .sign(getSecretKey());
   const tokenHash = sha256(rawToken);
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
   await db.insert(s.loginTokens).values({
-    email: email.toLowerCase().trim(),
+    email: cleanEmail,
     tokenHash,
     redirectTo,
     expiresAt,
@@ -132,28 +158,40 @@ export async function issueMagicLoginToken(email: string, redirectTo = "/account
 export async function consumeMagicLoginToken(rawToken: string) {
   const db = await getDb();
   const tokenHash = sha256(rawToken);
-  const [row] = await db
+  const [existingToken] = await db
     .select()
     .from(s.loginTokens)
-    .where(
-      and(
-        eq(s.loginTokens.tokenHash, tokenHash),
-        isNull(s.loginTokens.usedAt),
-        gt(s.loginTokens.expiresAt, new Date()),
-      ),
-    );
-  if (!row) return null;
+    .where(eq(s.loginTokens.tokenHash, tokenHash));
 
-  await db
-    .update(s.loginTokens)
-    .set({ usedAt: new Date() })
-    .where(eq(s.loginTokens.id, row.id));
+  if (existingToken) {
+    if (existingToken.usedAt || existingToken.expiresAt <= new Date()) {
+      return null;
+    }
 
-  const user = await findOrCreateUser({ email: row.email });
-  await db
-    .update(s.users)
-    .set({ lastLoginAt: new Date() })
-    .where(eq(s.users.id, user.id));
+    await db
+      .update(s.loginTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(s.loginTokens.id, existingToken.id), isNull(s.loginTokens.usedAt)));
 
-  return { user, redirectTo: row.redirectTo || "/account" };
+    const user = await findOrCreateUser({ email: existingToken.email });
+    await db
+      .update(s.users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(s.users.id, user.id));
+
+    return { user, redirectTo: existingToken.redirectTo || "/account" };
+  }
+
+  // Fallback for stateless/ephemeral serverless instances before a shared Postgres DB is attached
+  try {
+    const { payload } = await jwtVerify(rawToken, getSecretKey());
+    if (payload.purpose !== "magic-login" || typeof payload.email !== "string") {
+      return null;
+    }
+    const redirectTo = typeof payload.redirectTo === "string" ? payload.redirectTo : "/account";
+    const user = await findOrCreateUser({ email: payload.email });
+    return { user, redirectTo: redirectTo || "/account" };
+  } catch {
+    return null;
+  }
 }

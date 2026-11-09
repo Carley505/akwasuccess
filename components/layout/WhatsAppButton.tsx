@@ -1,15 +1,15 @@
 "use client";
 
 import { MessageCircle } from "lucide-react";
-import { whatsappLink } from "@/content/site";
+import { site, whatsappLink } from "@/content/site";
 import { track } from "@/lib/analytics/client";
 
 /**
  * Floating WhatsApp support button on desktop (`sm+`).
- * On mobile (`<= 640px`), WhatsApp is accessible in the MobileDrawer and
- * Contact bar so it never collides with the BottomNav or sticky buy bar.
+ * Hidden when `site.whatsapp` is empty so no broken link renders.
  */
 export function WhatsAppButton() {
+  if (!site.whatsapp) return null;
   return (
     <a
       href={whatsappLink("Hello Akwasuccess, I have a question about your resources.")}

@@ -19,13 +19,22 @@ export type Database = PostgresJsDatabase<typeof schema>;
 type Global = typeof globalThis & { __akwaDb?: Promise<Database> };
 const g = globalThis as Global;
 
+export function getDatabaseUrl() {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.DATABASE_POSTGRES_URL ||
+    process.env.POSTGRES_URL ||
+    ""
+  );
+}
+
 export function isEmbeddedDb() {
-  const url = process.env.DATABASE_URL ?? "";
+  const url = getDatabaseUrl();
   return url === "" || url.startsWith("pglite:");
 }
 
 async function createDb(): Promise<Database> {
-  const url = process.env.DATABASE_URL ?? "";
+  const url = getDatabaseUrl();
 
   if (!isEmbeddedDb()) {
     const postgres = (await import("postgres")).default;
@@ -35,15 +44,23 @@ async function createDb(): Promise<Database> {
 
   const dir = url.startsWith("pglite:")
     ? url.slice("pglite:".length)
-    : path.join(process.cwd(), ".data", "pglite");
+    : process.env.VERCEL
+      ? path.join("/tmp", "akwa-pglite")
+      : path.join(process.cwd(), ".data", "pglite");
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle: drizzleLite } = await import("drizzle-orm/pglite");
   const { migrate } = await import("drizzle-orm/pglite/migrator");
 
-  if (dir !== "memory") {
-    fs.mkdirSync(dir, { recursive: true });
+  let client;
+  try {
+    if (dir !== "memory") {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    client = dir === "memory" ? new PGlite() : new PGlite(dir, { relaxedDurability: true });
+  } catch {
+    // Fallback to in-memory PGlite if filesystem is read-only or locked
+    client = new PGlite({ relaxedDurability: true });
   }
-  const client = dir === "memory" ? new PGlite() : new PGlite(dir);
   const db = drizzleLite(client, { schema });
   await migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
 

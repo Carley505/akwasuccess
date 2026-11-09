@@ -4,7 +4,7 @@ import { footerNav } from "@/content/navigation";
 import { disclaimers, site } from "@/content/site";
 import { Logo } from "@/components/ui/Logo";
 import { PaymentBadges } from "@/components/ui/Trust";
-import { CurrencyToggle } from "@/components/ui/PriceTag";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { t } from "@/lib/i18n";
 
 /**
@@ -24,7 +24,7 @@ export function Footer() {
   ];
 
   return (
-    <footer className="pb-bottom-nav bg-green-900 text-white">
+    <footer className="pb-bottom-nav on-dark bg-green-900 text-white">
       <div className="container-site py-12 md:py-16">
         <div className="grid gap-8 lg:grid-cols-12">
           {/* Column 1: Brand + blurb + socials */}
@@ -32,7 +32,7 @@ export function Footer() {
             <Logo variant="mono-white" />
             <p className="max-w-sm text-sm leading-relaxed text-white/85">{t.footer.blurb}</p>
             <p className="text-xs text-white/75">
-              Based in {site.location} •{" "}
+              {site.location} •{" "}
               <a href={`mailto:${site.email}`} className="underline hover:text-white">
                 {site.email}
               </a>
@@ -102,17 +102,16 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Payment badges + currency toggle */}
+        {/* Payment badges + theme toggle */}
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-white/15 pt-8">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs font-semibold tracking-wider text-white/80 uppercase">
               {t.footer.weAccept}
             </span>
             <PaymentBadges dark />
+            <span className="text-xs text-white/75">• All prices in USD</span>
           </div>
-          <div className="rounded-md bg-surface p-0.5 text-fg">
-            <CurrencyToggle />
-          </div>
+          <ThemeToggle variant="segmented" tone="on-dark" />
         </div>
 
         {/* Mandatory educational risk disclaimer (shown on every page) */}
