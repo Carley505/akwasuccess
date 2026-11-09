@@ -73,6 +73,14 @@ const nextConfig: NextConfig = {
       { source: `${source}/`, destination, permanent: true },
     ]);
   },
+  async rewrites() {
+    return [
+      {
+        source: "/wp-content/:path*",
+        destination: "https://cms.akwasuccess.com/wp-content/:path*",
+      },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

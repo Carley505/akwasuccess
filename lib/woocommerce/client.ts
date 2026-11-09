@@ -2,7 +2,6 @@ import "server-only";
 import crypto from "node:crypto";
 
 const DEFAULT_WOO_SUBDOMAIN_URL = "https://cms.akwasuccess.com";
-const LEGACY_WOO_URL = "https://akwasuccess.com";
 
 export function getWooBaseUrl(): string {
   const raw = (process.env.WOOCOMMERCE_URL || DEFAULT_WOO_SUBDOMAIN_URL).trim();
@@ -31,17 +30,33 @@ function getBasicAuthHeader(): string {
   return `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}`;
 }
 
+function getAlternateWooUrl(urlStr: string): string | null {
+  if (urlStr.includes("://cms.akwasuccess.com")) {
+    return urlStr.replace("://cms.akwasuccess.com", "://akwasuccess.com");
+  }
+  if (urlStr.includes("://akwasuccess.com")) {
+    return urlStr.replace("://akwasuccess.com", "://cms.akwasuccess.com");
+  }
+  return null;
+}
+
 async function fetchWithSubdomainFallback(
   urlStr: string,
   init: RequestInit,
 ): Promise<Response> {
+  const alternateUrl = getAlternateWooUrl(urlStr);
   try {
-    return await fetch(urlStr, init);
+    const res = await fetch(urlStr, init);
+    // If akwasuccess.com has switched to Vercel, WP paths (/wp-json, /graphql, /wp-content)
+    // on akwasuccess.com will return 404 or HTML — automatically fall over to cms.akwasuccess.com
+    if (res.status === 404 && alternateUrl) {
+      return await fetch(alternateUrl, init);
+    }
+    return res;
   } catch (err) {
-    // If cms.akwasuccess.com is configured before DNS cutover, fall back to akwasuccess.com
-    if (urlStr.includes("://cms.akwasuccess.com")) {
-      const fallbackUrl = urlStr.replace("://cms.akwasuccess.com", "://akwasuccess.com");
-      return await fetch(fallbackUrl, init);
+    // Before DNS cutover (cms.akwasuccess.com ENOTFOUND) or during transition, fall back to alternate host
+    if (alternateUrl) {
+      return await fetch(alternateUrl, init);
     }
     throw err;
   }
@@ -110,9 +125,7 @@ export async function fetchWooDownloadBytes(opts: {
   buyerEmail: string;
   directFileUrl?: string | null;
 }): Promise<Uint8Array | null> {
-  const base = getWooBaseUrl().includes("cms.akwasuccess.com")
-    ? LEGACY_WOO_URL
-    : getWooBaseUrl();
+  const base = getWooBaseUrl();
 
   // 1. Try WooCommerce's native download permission endpoint (?download_file=...)
   if (opts.wooOrderKey) {
