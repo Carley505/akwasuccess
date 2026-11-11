@@ -6,6 +6,7 @@ import { absoluteUrl, formatMoney } from "@/lib/utils";
 
 export type EmailMessage = {
   to: string;
+  replyTo?: string;
   subject: string;
   html: string;
   text: string;
@@ -66,7 +67,38 @@ export async function sendEmail(msg: EmailMessage) {
   }
 
   const apiKey = process.env.EMAIL_API_KEY;
-  if (!apiKey) return { queued: true, provider: "local-outbox" };
+  if (!apiKey) {
+    // When EMAIL_API_KEY is not configured yet, forward admin notifications (to site.email)
+    // via FormSubmit AJAX relay so contact/booking/quote messages reach the owner's inbox.
+    if (msg.to.toLowerCase() === site.email.toLowerCase()) {
+      try {
+        const relayRes = await fetch(
+          `https://formsubmit.co/ajax/${encodeURIComponent(msg.to)}`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              accept: "application/json",
+              origin: "https://akwasuccess.com",
+              referer: "https://akwasuccess.com/contact",
+            },
+            body: JSON.stringify({
+              _subject: msg.subject,
+              ...(msg.replyTo ? { _replyto: msg.replyTo, email: msg.replyTo } : {}),
+              message: msg.text,
+            }),
+            signal: AbortSignal.timeout(6_000),
+          },
+        );
+        if (relayRes.ok) {
+          return { queued: true, provider: "formsubmit" };
+        }
+      } catch {
+        /* ignore relay errors; message is already saved in PostgreSQL */
+      }
+    }
+    return { queued: true, provider: "local-outbox" };
+  }
 
   const from = process.env.EMAIL_FROM || `Akwasuccess <${site.email}>`;
   const res = await fetch("https://api.resend.com/emails", {
@@ -78,6 +110,7 @@ export async function sendEmail(msg: EmailMessage) {
     body: JSON.stringify({
       from,
       to: [msg.to],
+      ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
       subject: msg.subject,
       html: msg.html,
       text: msg.text,

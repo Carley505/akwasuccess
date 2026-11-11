@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { site } from "@/content/site";
 import { getDb, schema as s } from "@/lib/db";
+import { sendEmail } from "@/lib/email";
 import { checkRateLimit, clientIp } from "@/lib/security";
 
 const schema = z.object({
@@ -31,15 +33,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Quote request received." });
   }
 
+  const cleanName = parsed.data.name.trim();
+  const cleanPhone = parsed.data.phone.trim();
+  const cleanEmail = parsed.data.email ? parsed.data.email.trim() : null;
+  const cleanLocation = parsed.data.location.trim();
+  const cleanDescription = parsed.data.description.trim();
+
   const db = await getDb();
   await db.insert(s.quoteRequests).values({
-    name: parsed.data.name.trim(),
-    phone: parsed.data.phone.trim(),
-    email: parsed.data.email ? parsed.data.email.trim() : null,
-    location: parsed.data.location.trim(),
+    name: cleanName,
+    phone: cleanPhone,
+    email: cleanEmail,
+    location: cleanLocation,
     serviceType: parsed.data.serviceType,
-    description: parsed.data.description.trim(),
+    description: cleanDescription,
     photoKeys: parsed.data.photos ?? [],
+  });
+
+  await sendEmail({
+    to: site.email,
+    replyTo: cleanEmail ?? undefined,
+    subject: `[Akwasuccess Quote] ${parsed.data.serviceType} — from ${cleanName}`,
+    html: `<p><strong>New electrical quote request on Akwasuccess:</strong></p>
+<ul>
+  <li><strong>Name:</strong> ${cleanName}</li>
+  <li><strong>Phone:</strong> ${cleanPhone}</li>
+  <li><strong>Email:</strong> ${cleanEmail ?? "Not provided"}</li>
+  <li><strong>Location:</strong> ${cleanLocation}</li>
+  <li><strong>Service Type:</strong> ${parsed.data.serviceType}</li>
+</ul>
+<p><strong>Description:</strong></p>
+<p style="white-space:pre-wrap;">${cleanDescription}</p>`,
+    text: `New electrical quote request on Akwasuccess:\n\nName: ${cleanName}\nPhone: ${cleanPhone}\nEmail: ${cleanEmail ?? "Not provided"}\nLocation: ${cleanLocation}\nService Type: ${parsed.data.serviceType}\n\nDescription:\n${cleanDescription}`,
   });
 
   return NextResponse.json({

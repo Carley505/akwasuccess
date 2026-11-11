@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { site } from "@/content/site";
 import { getDb, schema as s } from "@/lib/db";
+import { sendEmail } from "@/lib/email";
 import { checkRateLimit, clientIp } from "@/lib/security";
 
 const schema = z.object({
@@ -30,14 +32,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Booking received." });
   }
 
+  const cleanName = parsed.data.name.trim();
+  const cleanEmail = parsed.data.email.toLowerCase().trim();
+  const cleanPhone = parsed.data.phone.trim();
+  const cleanDate = parsed.data.preferredDate ? String(parsed.data.preferredDate) : null;
+  const cleanNotes = parsed.data.notes ? String(parsed.data.notes) : null;
+
   const db = await getDb();
   await db.insert(s.bookings).values({
-    name: parsed.data.name.trim(),
-    email: parsed.data.email.toLowerCase().trim(),
-    phone: parsed.data.phone.trim(),
+    name: cleanName,
+    email: cleanEmail,
+    phone: cleanPhone,
     packageId: parsed.data.packageId,
-    preferredDate: parsed.data.preferredDate ? String(parsed.data.preferredDate) : null,
-    notes: parsed.data.notes ? String(parsed.data.notes) : null,
+    preferredDate: cleanDate,
+    notes: cleanNotes,
+  });
+
+  await sendEmail({
+    to: site.email,
+    replyTo: cleanEmail,
+    subject: `[Akwasuccess Booking] ${parsed.data.packageId} — from ${cleanName}`,
+    html: `<p><strong>New consulting booking request on Akwasuccess:</strong></p>
+<ul>
+  <li><strong>Name:</strong> ${cleanName}</li>
+  <li><strong>Email:</strong> ${cleanEmail}</li>
+  <li><strong>Phone:</strong> ${cleanPhone}</li>
+  <li><strong>Package:</strong> ${parsed.data.packageId}</li>
+  <li><strong>Preferred Date:</strong> ${cleanDate ?? "Not specified"}</li>
+</ul>
+<p><strong>Notes:</strong></p>
+<p style="white-space:pre-wrap;">${cleanNotes ?? "None"}</p>`,
+    text: `New consulting booking request on Akwasuccess:\n\nName: ${cleanName}\nEmail: ${cleanEmail}\nPhone: ${cleanPhone}\nPackage: ${parsed.data.packageId}\nPreferred Date: ${cleanDate ?? "Not specified"}\n\nNotes:\n${cleanNotes ?? "None"}`,
   });
 
   return NextResponse.json({

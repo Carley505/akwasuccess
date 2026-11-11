@@ -13,10 +13,9 @@ export const site = {
   /** All prices are stored and charged in US dollars (integer cents). */
   currency: "USD",
   location: "Online, serving learners worldwide",
-  // TODO: owner to supply real contact details (see TODO_OWNER.md).
-  email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "hello@akwasuccess.com",
-  /** International format, digits only (no "+"). Empty hides the WhatsApp button. TODO: owner to supply. */
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "",
+  email: (process.env.NEXT_PUBLIC_CONTACT_EMAIL || "akwasuccess2026@gmail.com").trim(),
+  /** International format, digits only (no "+"). Empty hides the WhatsApp button. */
+  whatsapp: (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "2347035714013").replace(/[^0-9]/g, ""),
   workingHours: "Monday to Friday, 08:00 to 17:00 UTC",
   responseTime: "We usually reply within one working day, wherever you are.",
   socials: [
