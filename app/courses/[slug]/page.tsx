@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock, PlayCircle } from "lucide-react";
 import { getCategory } from "@/content/categories";
-import { seedProducts } from "@/content/products";
 import { productDefaultFaqs } from "@/content/faqs";
 import { isSampleDataVisible } from "@/content/site";
 import { PageHeader, Section } from "@/components/ui/Layout";
@@ -22,11 +21,7 @@ import { absoluteUrl } from "@/lib/utils";
 
 type Params = Promise<{ slug: string }>;
 
-export function generateStaticParams() {
-  return seedProducts
-    .filter((p) => p.type === "course" || p.type === "tutorial")
-    .map((p) => ({ slug: p.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;

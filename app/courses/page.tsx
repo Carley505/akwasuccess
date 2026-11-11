@@ -11,6 +11,8 @@ import { DisclaimerBanner } from "@/components/ui/DisclaimerBanner";
 import { getCoursesWithCurriculum } from "@/lib/db/queries";
 import { effectivePrice, isOnSale, isPurchasable } from "@/lib/pricing";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Courses & Tutorials",
   description:

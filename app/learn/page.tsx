@@ -11,6 +11,8 @@ import { NewsletterForm } from "@/components/marketing/NewsletterForm";
 import { getArticles } from "@/lib/db/queries";
 import { formatDate, readingTime } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Free Learning Hub — Beginner Guides & Articles",
   description:

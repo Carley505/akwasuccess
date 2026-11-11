@@ -53,6 +53,14 @@ const legacyRedirects: [string, string][] = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Constrain build worker concurrency so shared container environments (e.g. Hostinger)
+  // do not spawn 60+ workers and abort with SIGABRT during static page generation.
+  experimental: {
+    cpus: 1,
+    workerThreads: false,
+    staticGenerationMaxConcurrency: 1,
+    staticGenerationMinPagesPerWorker: 50,
+  },
   // PGlite ships WebAssembly + data files that must not be bundled.
   serverExternalPackages: ["@electric-sql/pglite"],
   outputFileTracingIncludes: {

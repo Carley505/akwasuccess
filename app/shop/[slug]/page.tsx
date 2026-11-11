@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
-import { getCategory, shopCategories } from "@/content/categories";
-import { seedProducts } from "@/content/products";
-import { sampleBundle } from "@/content/sample-data";
+import { getCategory } from "@/content/categories";
 import { productDefaultFaqs } from "@/content/faqs";
 import { getPath } from "@/content/paths";
 import { isSampleDataVisible } from "@/content/site";
@@ -28,13 +26,7 @@ import { bundleSavings, effectivePrice, isOnSale, isPurchasable } from "@/lib/pr
 import { absoluteUrl, formatDate, formatMoney } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 
-export function generateStaticParams() {
-  return [
-    ...shopCategories.map((c) => ({ slug: c.slug })),
-    ...seedProducts.map((p) => ({ slug: p.slug })),
-    { slug: sampleBundle.slug },
-  ];
-}
+export const dynamic = "force-dynamic";
 
 type Params = Promise<{ slug: string }>;
 

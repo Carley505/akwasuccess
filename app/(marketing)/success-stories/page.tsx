@@ -5,6 +5,8 @@ import { DisclaimerBanner } from "@/components/ui/DisclaimerBanner";
 import { ShareStoryForm } from "@/components/marketing/ShareStoryForm";
 import { getApprovedTestimonials } from "@/lib/db/queries";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Reader & Learner Stories",
   description:

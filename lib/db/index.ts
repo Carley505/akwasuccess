@@ -38,7 +38,7 @@ async function createDb(): Promise<Database> {
 
   if (!isEmbeddedDb()) {
     const postgres = (await import("postgres")).default;
-    const client = postgres(url, { max: 5, prepare: false });
+    const client = postgres(url, { max: 2, idle_timeout: 20, connect_timeout: 10, prepare: false });
     return drizzlePg(client, { schema });
   }
 

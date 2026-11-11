@@ -5,6 +5,8 @@ import { ShopCatalog } from "@/components/product/ShopCatalog";
 import { DisclaimerBanner } from "@/components/ui/DisclaimerBanner";
 import { queryProducts } from "@/lib/db/queries";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Shop eBooks, Courses & Tutorials",
   description:

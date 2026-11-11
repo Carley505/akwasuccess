@@ -4,6 +4,8 @@ import { shopCategories } from "@/content/categories";
 import { learningPaths } from "@/content/paths";
 import { getArticles, queryProducts } from "@/lib/db/queries";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPaths = [
     "",
@@ -26,10 +28,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...learningPaths.map((p) => `/learn/paths/${p.slug}`),
   ];
 
-  const [{ items: products }, articles] = await Promise.all([
-    queryProducts({ limit: 200 }),
-    getArticles({ limit: 200 }),
-  ]);
+  let products: Awaited<ReturnType<typeof queryProducts>>["items"] = [];
+  let articles: Awaited<ReturnType<typeof getArticles>> = [];
+  try {
+    const [prodRes, artRes] = await Promise.all([
+      queryProducts({ limit: 200 }),
+      getArticles({ limit: 200 }),
+    ]);
+    products = prodRes.items;
+    articles = artRes;
+  } catch {
+    // Fallback to static paths if database is unavailable at build time
+  }
 
   const now = new Date();
 

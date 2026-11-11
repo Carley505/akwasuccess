@@ -23,6 +23,8 @@ import {
 import { formatDate, readingTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [featured, latestArticles, testimonials] = await Promise.all([
     getFeaturedProducts(4),
