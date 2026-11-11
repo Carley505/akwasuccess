@@ -1,7 +1,12 @@
 import "server-only";
 import crypto from "node:crypto";
 
-const DEFAULT_WOO_SUBDOMAIN_URL = "https://cms.akwasuccess.com";
+const DEFAULT_WOO_SUBDOMAIN_URL = "https://darkgrey-lemur-121864.hostingersite.com";
+const FALLBACK_WOO_URLS = [
+  "https://darkgrey-lemur-121864.hostingersite.com",
+  "https://cms.akwasuccess.com",
+  "https://akwasuccess.com",
+];
 
 export function getWooBaseUrl(): string {
   const raw = (process.env.WOOCOMMERCE_URL || DEFAULT_WOO_SUBDOMAIN_URL).trim();
@@ -30,33 +35,39 @@ function getBasicAuthHeader(): string {
   return `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}`;
 }
 
-function getAlternateWooUrl(urlStr: string): string | null {
-  if (urlStr.includes("://cms.akwasuccess.com")) {
-    return urlStr.replace("://cms.akwasuccess.com", "://akwasuccess.com");
-  }
-  if (urlStr.includes("://akwasuccess.com")) {
-    return urlStr.replace("://akwasuccess.com", "://cms.akwasuccess.com");
-  }
-  return null;
+function getAlternateWooUrls(urlStr: string): string[] {
+  const matchedBase = FALLBACK_WOO_URLS.find((base) => urlStr.startsWith(base));
+  if (!matchedBase) return [];
+  return FALLBACK_WOO_URLS.filter((base) => base !== matchedBase).map((base) =>
+    urlStr.replace(matchedBase, base),
+  );
 }
 
 async function fetchWithSubdomainFallback(
   urlStr: string,
   init: RequestInit,
 ): Promise<Response> {
-  const alternateUrl = getAlternateWooUrl(urlStr);
+  const alternates = getAlternateWooUrls(urlStr);
   try {
     const res = await fetch(urlStr, init);
-    // If akwasuccess.com has switched to Vercel, WP paths (/wp-json, /graphql, /wp-content)
-    // on akwasuccess.com will return 404 or HTML — automatically fall over to cms.akwasuccess.com
-    if (res.status === 404 && alternateUrl) {
-      return await fetch(alternateUrl, init);
+    if (res.status === 404 && alternates.length > 0) {
+      for (const alt of alternates) {
+        try {
+          const altRes = await fetch(alt, init);
+          if (altRes.status !== 404) return altRes;
+        } catch {
+          // try next alternate
+        }
+      }
     }
     return res;
   } catch (err) {
-    // Before DNS cutover (cms.akwasuccess.com ENOTFOUND) or during transition, fall back to alternate host
-    if (alternateUrl) {
-      return await fetch(alternateUrl, init);
+    for (const alt of alternates) {
+      try {
+        return await fetch(alt, init);
+      } catch {
+        // try next alternate
+      }
     }
     throw err;
   }
