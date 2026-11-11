@@ -1,10 +1,11 @@
 import "server-only";
 import crypto from "node:crypto";
 
-const DEFAULT_WOO_SUBDOMAIN_URL = "https://darkgrey-lemur-121864.hostingersite.com";
+const DEFAULT_WOO_SUBDOMAIN_URL = "https://cms.akwasuccess.com";
 const FALLBACK_WOO_URLS = [
-  "https://darkgrey-lemur-121864.hostingersite.com",
   "https://cms.akwasuccess.com",
+  "https://lightsteelblue-locust-438674.hostingersite.com",
+  "https://darkgrey-lemur-121864.hostingersite.com",
   "https://akwasuccess.com",
 ];
 

@@ -71,8 +71,9 @@ const nextConfig: NextConfig = {
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536, 1920],
     qualities: [60, 75],
     remotePatterns: [
-      { protocol: "https", hostname: "darkgrey-lemur-121864.hostingersite.com" },
       { protocol: "https", hostname: "cms.akwasuccess.com" },
+      { protocol: "https", hostname: "lightsteelblue-locust-438674.hostingersite.com" },
+      { protocol: "https", hostname: "darkgrey-lemur-121864.hostingersite.com" },
       { protocol: "https", hostname: "akwasuccess.com" },
     ],
   },
@@ -86,7 +87,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/wp-content/:path*",
-        destination: "https://darkgrey-lemur-121864.hostingersite.com/wp-content/:path*",
+        destination: "https://cms.akwasuccess.com/wp-content/:path*",
       },
     ];
   },
