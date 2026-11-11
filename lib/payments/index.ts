@@ -17,11 +17,40 @@ export function isPaymentSandboxAllowed() {
   return process.env.NODE_ENV !== "production" || process.env.ALLOW_PAYMENT_SANDBOX === "true";
 }
 
+let cachedUsdToNgnRate: { rate: number; fetchedAt: number } | null = null;
+
+async function getUsdToNgnRate(): Promise<number> {
+  const envRate = Number(process.env.PAYSTACK_USD_NGN_RATE);
+  if (Number.isFinite(envRate) && envRate > 0) return envRate;
+
+  const now = Date.now();
+  if (cachedUsdToNgnRate && now - cachedUsdToNgnRate.fetchedAt < 60 * 60 * 1000) {
+    return cachedUsdToNgnRate.rate;
+  }
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/USD", {
+      signal: AbortSignal.timeout(3_500),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { rates?: { NGN?: number } };
+      const rate = Number(json.rates?.NGN);
+      if (Number.isFinite(rate) && rate > 100) {
+        cachedUsdToNgnRate = { rate, fetchedAt: now };
+        return rate;
+      }
+    }
+  } catch {
+    // Use fallback rate if live FX lookup times out
+  }
+  return 1600;
+}
+
 /**
  * Initiates a Paystack card checkout in USD when PAYSTACK_SECRET_KEY is set
- * (returning both `accessCode` for the seamless in-site Paystack inline popup
- * and `authorizationUrl` fallback), or returns a local sandbox mode when live
- * keys have not been added yet.
+ * (automatically falling back to the merchant's NGN currency with live FX
+ * conversion when USD settlement is not yet enabled on the Paystack account),
+ * or returns a local sandbox mode when live keys have not been added yet.
  */
 export async function initiateCardPayment(opts: {
   reference: string;
@@ -35,10 +64,14 @@ export async function initiateCardPayment(opts: {
   authorizationUrl: string;
   accessCode?: string;
   publicKey?: string;
+  chargedCurrency?: string;
+  chargedAmountSubunits?: number;
+  errorMessage?: string;
 }> {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
-  const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+  const secret = (process.env.PAYSTACK_SECRET_KEY ?? "").replace(/\s+/g, "");
+  const publicKey = (process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY ?? "").replace(/\s+/g, "");
   const callbackUrl = absoluteUrl(`/checkout/order/${opts.orderId}`);
+  const usdCents = Math.round(opts.amountCents);
 
   if (!secret) {
     if (!isPaymentSandboxAllowed()) {
@@ -48,41 +81,92 @@ export async function initiateCardPayment(opts: {
       ok: true,
       provider: "mock",
       authorizationUrl: callbackUrl,
+      chargedCurrency: "USD",
+      chargedAmountSubunits: usdCents,
     };
   }
 
-  const res = await fetch("https://api.paystack.co/transaction/initialize", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${secret}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      email: opts.email,
-      amount: Math.round(opts.amountCents), // USD, in cents
-      currency: "USD",
-      reference: opts.reference,
-      callback_url: callbackUrl,
-      metadata: {
-        order_id: opts.wooOrderId ?? opts.orderId,
-        akwa_order_id: opts.orderId,
-        woo_order_id: opts.wooOrderId ?? null,
-      },
-    }),
-  });
-  const data = (await res.json()) as {
+  type PaystackInitResponse = {
     status?: boolean;
+    message?: string;
+    code?: string;
     data?: { authorization_url?: string; access_code?: string; reference?: string };
   };
-  if (!res.ok || !data.status || !data.data?.authorization_url) {
-    return { ok: false, provider: "paystack", authorizationUrl: "" };
+
+  async function callPaystackInit(currency: string | undefined, amountSubunits: number) {
+    const res = await fetch("https://api.paystack.co/transaction/initialize", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${secret}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email: opts.email,
+        amount: amountSubunits,
+        ...(currency ? { currency } : {}),
+        reference: opts.reference,
+        callback_url: callbackUrl,
+        metadata: {
+          order_id: opts.wooOrderId ?? opts.orderId,
+          akwa_order_id: opts.orderId,
+          woo_order_id: opts.wooOrderId ?? null,
+          expected_usd_cents: usdCents,
+          charged_currency: currency ?? "NGN",
+          charged_subunits: amountSubunits,
+        },
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as PaystackInitResponse;
+    return { ok: res.ok, data };
   }
+
+  // 1. Try initializing in USD first
+  const usdAttempt = await callPaystackInit("USD", usdCents);
+  if (usdAttempt.ok && usdAttempt.data.status && usdAttempt.data.data?.authorization_url) {
+    return {
+      ok: true,
+      provider: "paystack",
+      authorizationUrl: usdAttempt.data.data.authorization_url,
+      accessCode: usdAttempt.data.data.access_code,
+      publicKey: publicKey || undefined,
+      chargedCurrency: "USD",
+      chargedAmountSubunits: usdCents,
+    };
+  }
+
+  // 2. If merchant's Paystack integration only supports NGN (unsupported_currency),
+  // convert USD cents -> NGN kobo using the live exchange rate so card payments go through immediately.
+  if (
+    usdAttempt.data.code === "unsupported_currency" ||
+    (usdAttempt.data.message ?? "").toLowerCase().includes("currency")
+  ) {
+    const rate = await getUsdToNgnRate();
+    const ngnKobo = Math.max(100, Math.round(usdCents * rate));
+    const ngnAttempt = await callPaystackInit(undefined, ngnKobo);
+    if (ngnAttempt.ok && ngnAttempt.data.status && ngnAttempt.data.data?.authorization_url) {
+      return {
+        ok: true,
+        provider: "paystack",
+        authorizationUrl: ngnAttempt.data.data.authorization_url,
+        accessCode: ngnAttempt.data.data.access_code,
+        publicKey: publicKey || undefined,
+        chargedCurrency: "NGN",
+        chargedAmountSubunits: ngnKobo,
+      };
+    }
+    return {
+      ok: false,
+      provider: "paystack",
+      authorizationUrl: "",
+      errorMessage: ngnAttempt.data.message,
+    };
+  }
+
   return {
-    ok: true,
+    ok: false,
     provider: "paystack",
-    authorizationUrl: data.data.authorization_url,
-    accessCode: data.data.access_code,
-    publicKey: publicKey || undefined,
+    authorizationUrl: "",
+    errorMessage: usdAttempt.data.message,
   };
 }
 
@@ -94,7 +178,7 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
   transactionId?: string;
   raw?: unknown;
 }> {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const secret = (process.env.PAYSTACK_SECRET_KEY ?? "").replace(/\s+/g, "");
   if (!secret || !reference) {
     return { ok: false, status: "unconfigured", amountCents: 0, currency: "" };
   }
@@ -137,7 +221,7 @@ export async function verifyPaystackTransaction(reference: string): Promise<{
 }
 
 export function verifyPaystackSignature(rawBody: string, signature: string | null): boolean {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const secret = (process.env.PAYSTACK_SECRET_KEY ?? "").replace(/\s+/g, "");
   if (!secret || !signature) return false;
   const expected = crypto.createHmac("sha512", secret).update(rawBody).digest("hex");
   const a = Buffer.from(expected);
@@ -147,18 +231,33 @@ export function verifyPaystackSignature(rawBody: string, signature: string | nul
 }
 
 /**
- * Verifies that a Paystack payment amount and currency match the expected USD
- * cents on the order.
+ * Verifies that a Paystack payment amount and currency match either the
+ * expected USD cents on the order OR the converted settlement currency/amount
+ * stored in `providerRef` (e.g. `NGN:16640000`).
  */
 export function isPaystackAmountValid(
   expectedAmountCents: number,
   actualAmountCents: number,
   actualCurrency: string,
+  providerRef?: string | null,
 ): boolean {
-  return (
-    actualCurrency.toUpperCase() === "USD" &&
-    Math.round(actualAmountCents) === Math.round(expectedAmountCents)
-  );
+  const normCurrency = actualCurrency.toUpperCase();
+  if (normCurrency === "USD" && Math.round(actualAmountCents) === Math.round(expectedAmountCents)) {
+    return true;
+  }
+  if (providerRef && providerRef.includes(":")) {
+    const [expectedCurr, expectedSubunitsStr] = providerRef.split(":");
+    const expectedSubunits = Number(expectedSubunitsStr);
+    if (
+      expectedCurr &&
+      normCurrency === expectedCurr.toUpperCase() &&
+      Number.isFinite(expectedSubunits) &&
+      Math.round(actualAmountCents) === Math.round(expectedSubunits)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

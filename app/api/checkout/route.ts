@@ -248,6 +248,11 @@ export async function POST(req: NextRequest) {
     wooOrderId: wooOrder?.wooOrderId,
   });
 
+  const providerRef =
+    card.chargedCurrency && card.chargedAmountSubunits
+      ? `${card.chargedCurrency}:${card.chargedAmountSubunits}`
+      : reference;
+
   const [payment] = await db
     .insert(s.payments)
     .values({
@@ -257,14 +262,15 @@ export async function POST(req: NextRequest) {
       status: card.ok ? "pending" : "failed",
       amountCents: totals.totalCents,
       reference,
-      providerRef: reference,
+      providerRef,
     })
     .returning();
 
   if (!card.ok) {
     return NextResponse.json(
       {
-        error: "Could not start card checkout. Please try again in a moment.",
+        error:
+          card.errorMessage || "Could not start card checkout. Please try again in a moment.",
         paymentId: payment!.id,
       },
       { status: 400 },
@@ -280,6 +286,8 @@ export async function POST(req: NextRequest) {
     status: "pending",
     reference,
     amountCents: totals.totalCents,
+    chargedCurrency: card.chargedCurrency ?? "USD",
+    chargedAmountSubunits: card.chargedAmountSubunits ?? totals.totalCents,
     email: user.email,
     accessCode: card.accessCode,
     publicKey: card.publicKey,

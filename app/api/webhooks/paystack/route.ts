@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema as s } from "@/lib/db";
-import { settleOrderPayment, verifyPaystackSignature } from "@/lib/payments";
+import {
+  isPaystackAmountValid,
+  settleOrderPayment,
+  verifyPaystackSignature,
+} from "@/lib/payments";
 
 /**
  * Paystack webhook handler (HMAC-SHA512 signature verified, idempotent).
@@ -40,9 +44,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  // Only trust a success whose amount and currency match what we charged (USD cents).
-  const paidInFull =
-    payload.data?.currency === "USD" && Number(payload.data?.amount) === payment.amountCents;
+  // Only trust a success whose amount and currency match what we charged.
+  const paidInFull = isPaystackAmountValid(
+    payment.amountCents,
+    Number(payload.data?.amount ?? 0),
+    String(payload.data?.currency ?? ""),
+    payment.providerRef,
+  );
   const succeeded =
     payload.event === "charge.success" && payload.data?.status === "success" && paidInFull;
   await settleOrderPayment({

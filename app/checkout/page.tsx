@@ -33,6 +33,8 @@ type CheckoutResponse = {
   status?: string;
   reference?: string;
   amountCents?: number;
+  chargedCurrency?: string;
+  chargedAmountSubunits?: number;
   email?: string;
   accessCode?: string;
   publicKey?: string;
@@ -183,8 +185,11 @@ export default function CheckoutPage() {
       }
 
       // Option A: Seamless In-Site Paystack Inline Checkout
-      const publicKey =
-        data.publicKey || process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
+      const publicKey = (
+        data.publicKey ||
+        process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY ||
+        ""
+      ).replace(/\s+/g, "");
 
       if (publicKey && data.reference) {
         const paystackPop = await loadPaystackInlineScript();
@@ -192,8 +197,8 @@ export default function CheckoutPage() {
           const handler = paystackPop.setup({
             key: publicKey,
             email: data.email || effectiveEmail.trim(),
-            amount: data.amountCents ?? totals.totalCents,
-            currency: "USD",
+            amount: data.chargedAmountSubunits ?? data.amountCents ?? totals.totalCents,
+            currency: data.chargedCurrency || "USD",
             ref: data.reference,
             access_code: data.accessCode,
             callback: (response) => {

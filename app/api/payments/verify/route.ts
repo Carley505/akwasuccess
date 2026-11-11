@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     payment.amountCents,
     verified.amountCents,
     verified.currency,
+    payment.providerRef,
   );
   const succeeded = verified.ok && amountMatches;
 

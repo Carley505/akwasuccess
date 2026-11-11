@@ -68,6 +68,8 @@ describe("Signed 4-hour download tokens & webhook signature verification", () =>
     expect(isPaystackAmountValid(500, 500, "USD")).toBe(true);
     expect(isPaystackAmountValid(500, 400, "USD")).toBe(false);
     expect(isPaystackAmountValid(500, 500, "NGN")).toBe(false);
+    expect(isPaystackAmountValid(500, 800000, "NGN", "NGN:800000")).toBe(true);
+    expect(isPaystackAmountValid(500, 700000, "NGN", "NGN:800000")).toBe(false);
   });
 
   it("classifies WooCommerce products into categories, formats, and integer USD cents", () => {
