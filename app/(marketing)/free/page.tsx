@@ -42,7 +42,8 @@ export default function FreeResourcesPage() {
             <p className="text-sm">
               <a
                 href="/samples/crypto-safety-checklist.pdf"
-                download
+                target="_blank"
+                rel="noopener noreferrer"
                 className="link inline-flex items-center gap-1.5 font-semibold"
               >
                 <FileDown className="size-4" aria-hidden />
@@ -82,7 +83,8 @@ export default function FreeResourcesPage() {
               <div className="flex flex-wrap items-center gap-4 text-sm">
                 <a
                   href={`/${p.sampleFileKey}`}
-                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 items-center gap-2 rounded-md px-4 font-semibold no-underline"
                 >
                   <FileDown className="size-4" aria-hidden />

@@ -68,34 +68,37 @@ export async function sendEmail(msg: EmailMessage) {
 
   const apiKey = process.env.EMAIL_API_KEY;
   if (!apiKey) {
-    // When EMAIL_API_KEY is not configured yet, forward admin notifications (to site.email)
-    // via FormSubmit AJAX relay so contact/booking/quote messages reach the owner's inbox.
-    if (msg.to.toLowerCase() === site.email.toLowerCase()) {
-      try {
-        const relayRes = await fetch(
-          `https://formsubmit.co/ajax/${encodeURIComponent(msg.to)}`,
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              accept: "application/json",
-              origin: "https://akwasuccess.com",
-              referer: "https://akwasuccess.com/contact",
-            },
-            body: JSON.stringify({
-              _subject: msg.subject,
-              ...(msg.replyTo ? { _replyto: msg.replyTo, email: msg.replyTo } : {}),
-              message: msg.text,
-            }),
-            signal: AbortSignal.timeout(6_000),
+    // When EMAIL_API_KEY is not configured yet, relay via the activated FormSubmit
+    // endpoint for akwasuccess2026@gmail.com (including _cc when sending to a subscriber/buyer).
+    const ownerEmail = site.email || "akwasuccess2026@gmail.com";
+    const recipient = msg.to.trim();
+    const isToOwner = recipient.toLowerCase() === ownerEmail.toLowerCase();
+    try {
+      const relayRes = await fetch(
+        `https://formsubmit.co/ajax/${encodeURIComponent(ownerEmail)}`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json",
+            origin: "https://akwasuccess.com",
+            referer: "https://akwasuccess.com/contact",
           },
-        );
-        if (relayRes.ok) {
-          return { queued: true, provider: "formsubmit" };
-        }
-      } catch {
-        /* ignore relay errors; message is already saved in PostgreSQL */
+          body: JSON.stringify({
+            _subject: msg.subject,
+            email: msg.replyTo || recipient,
+            ...(msg.replyTo ? { _replyto: msg.replyTo } : { _replyto: recipient }),
+            ...(!isToOwner ? { _cc: recipient, recipient } : {}),
+            message: msg.text,
+          }),
+          signal: AbortSignal.timeout(6_000),
+        },
+      );
+      if (relayRes.ok) {
+        return { queued: true, provider: "formsubmit" };
       }
+    } catch {
+      /* ignore relay errors; record is already saved in PostgreSQL */
     }
     return { queued: true, provider: "local-outbox" };
   }

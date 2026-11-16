@@ -22,12 +22,14 @@ export function NewsletterForm({
 }) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setStatus(null);
+    setDownloadUrl(null);
     const formData = new FormData(e.currentTarget);
     const honeypot = String(formData.get("company_website") ?? "");
 
@@ -37,18 +39,27 @@ export function NewsletterForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, source, company_website: honeypot }),
       });
-      const data = (await res.json()) as { message?: string; error?: string };
+      const data = (await res.json()) as {
+        message?: string;
+        error?: string;
+        downloadUrl?: string;
+      };
       if (!res.ok) {
         setStatus({ tone: "error", message: data.error ?? "Could not subscribe right now." });
       } else {
         track("newsletter_signup", { source });
         setEmail("");
+        const url = data.downloadUrl ?? "/samples/crypto-safety-checklist.pdf";
+        setDownloadUrl(url);
         setStatus({
           tone: "success",
           message:
             data.message ??
-            "Thank you! Check your inbox for your free guide and confirmation link.",
+            "Thank you! Your free Cryptocurrency Safety Checklist (PDF) is ready below.",
         });
+        if (typeof window !== "undefined") {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
       }
     } catch {
       setStatus({ tone: "error", message: "Network error. Please try again." });
@@ -89,7 +100,25 @@ export function NewsletterForm({
         </Link>
         .
       </p>
-      {status && <FormAlert tone={status.tone}>{status.message}</FormAlert>}
+      {status && (
+        <FormAlert tone={status.tone}>
+          <div className="space-y-2">
+            <p>{status.message}</p>
+            {downloadUrl && (
+              <p>
+                <a
+                  href={downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-10 items-center justify-center rounded-md px-4 py-2 text-xs font-semibold no-underline"
+                >
+                  Open &amp; Download Checklist (PDF) →
+                </a>
+              </p>
+            )}
+          </div>
+        </FormAlert>
+      )}
     </form>
   );
 }

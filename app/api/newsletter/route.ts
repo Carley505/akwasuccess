@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     message:
-      "Thank you! We have sent the free Cryptocurrency Safety Checklist (PDF) to your email.",
+      "Thank you! Your free Cryptocurrency Safety Checklist (PDF) is ready below and has also been sent to your email.",
+    downloadUrl: "/samples/crypto-safety-checklist.pdf",
   });
 }
