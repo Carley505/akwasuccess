@@ -168,8 +168,12 @@ export default async function ShopCategoryOrProductPage({
         )
       : null;
 
-  const disclaimerVariant: "crypto" | "health" =
-    product.categorySlug === "psychology" ? "health" : "crypto";
+  const disclaimerVariant: "crypto" | "health" | "copyright" =
+    product.categorySlug === "free-books" || displayProduct.isFree
+      ? "copyright"
+      : product.categorySlug === "psychology"
+        ? "health"
+        : "crypto";
 
   return (
     <>
@@ -250,8 +254,13 @@ export default async function ShopCategoryOrProductPage({
                   salePriceCents: displayProduct.salePriceCents,
                   isFree: displayProduct.isFree,
                   sampleFileKey: product.sampleFileKey,
+                  freeDownloadUrl: product.wooDownloads?.[0]?.file ?? null,
                 }}
               />
+
+              {(product.categorySlug === "free-books" || displayProduct.isFree) && (
+                <DisclaimerBanner variant="copyright" compact />
+              )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <PaymentBadges />

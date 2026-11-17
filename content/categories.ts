@@ -8,6 +8,7 @@ export type CategorySlug =
   | "technical"
   | "psychology"
   | "marketing"
+  | "free-books"
   | "services";
 
 export type Category = {
@@ -16,8 +17,8 @@ export type Category = {
   shortName: string;
   description: string;
   topics: string[];
-  icon: "coins" | "wallet" | "cpu" | "brain" | "megaphone" | "briefcase";
-  disclaimer?: "crypto" | "health";
+  icon: "coins" | "wallet" | "cpu" | "brain" | "megaphone" | "book" | "briefcase";
+  disclaimer?: "crypto" | "health" | "copyright";
   /** Where the category card links to. */
   href: string;
 };
@@ -115,6 +116,23 @@ export const categories: Category[] = [
     ],
     icon: "megaphone",
     href: "/shop/marketing",
+  },
+  {
+    slug: "free-books",
+    name: "Free Books & Reference Library",
+    shortName: "Free Books",
+    description:
+      "Classic educational reference works and public-domain books available free to read online and download for personal study.",
+    topics: [
+      "Chambers Twentieth Century Dictionary",
+      "The Psychology of Singing",
+      "English language & vocabulary reference",
+      "Voice culture & vocal pedagogy",
+      "Educational reference library",
+    ],
+    icon: "book",
+    disclaimer: "copyright",
+    href: "/shop/free-books",
   },
   {
     slug: "services",

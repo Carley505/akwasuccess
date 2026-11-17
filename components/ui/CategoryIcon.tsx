@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Brain,
   Briefcase,
   Coins,
@@ -15,6 +16,7 @@ const map = {
   cpu: Cpu,
   brain: Brain,
   megaphone: Megaphone,
+  book: BookOpen,
   briefcase: Briefcase,
 };
 

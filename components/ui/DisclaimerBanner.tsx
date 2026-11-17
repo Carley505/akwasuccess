@@ -1,21 +1,28 @@
-import { HeartPulse, ShieldAlert } from "lucide-react";
+import { BookOpen, HeartPulse, ShieldAlert } from "lucide-react";
 import { disclaimers } from "@/content/site";
 import { cn } from "@/lib/utils";
 
-/** Mandatory disclaimers (spec 2.4). Variants: crypto/finance and health. */
+/** Mandatory disclaimers (spec 2.4). Variants: crypto/finance, health, and copyright attribution. */
 export function DisclaimerBanner({
   variant,
   className,
   compact,
 }: {
-  variant: "crypto" | "health";
+  variant: "crypto" | "health" | "copyright";
   className?: string;
   compact?: boolean;
 }) {
-  const Icon = variant === "crypto" ? ShieldAlert : HeartPulse;
+  const Icon =
+    variant === "crypto" ? ShieldAlert : variant === "health" ? HeartPulse : BookOpen;
+  const label =
+    variant === "crypto"
+      ? "Educational notice"
+      : variant === "health"
+        ? "Health notice"
+        : "Copyright and attribution notice";
   return (
     <aside
-      aria-label={variant === "crypto" ? "Educational notice" : "Health notice"}
+      aria-label={label}
       className={cn(
         "border-gold-500 bg-tint-gold text-fg flex gap-3 rounded-lg border-l-4 p-4",
         compact && "p-3 text-sm",

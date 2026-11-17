@@ -134,13 +134,15 @@ export function classifyWooProduct(woo: WooRawProduct): ClassifiedWooProduct {
 
   let categorySlug: CategorySlug = "crypto";
   const explicitCat = (woo.categories ?? []).find((c) =>
-    ["crypto", "finance", "technical", "psychology", "marketing", "services"].includes(
+    ["crypto", "finance", "technical", "psychology", "marketing", "free-books", "services"].includes(
       c.slug.toLowerCase(),
     ),
   );
 
   if (explicitCat) {
     categorySlug = explicitCat.slug.toLowerCase() as CategorySlug;
+  } else if (/\b(chambers|twentieth century dictionary|psychology of singing)\b/.test(hay)) {
+    categorySlug = "free-books";
   } else if (/\b(tiktok|instagram|facebook|marketing|social media)\b/.test(hay)) {
     categorySlug = "marketing";
   } else if (/\b(electric|electronics|instrumentation|automation|plc)\b/.test(hay)) {
@@ -195,8 +197,18 @@ export function classifyWooProduct(woo: WooRawProduct): ClassifiedWooProduct {
     shortClean ||
     `${woo.name} — practical digital education from Akwasuccess with instant 4-hour download access upon purchase.`;
 
+  const isFree =
+    categorySlug === "free-books" ||
+    /\b(chambers|twentieth century dictionary|psychology of singing)\b/.test(hay);
+
   const outcomes =
-    categorySlug === "marketing"
+    categorySlug === "free-books"
+      ? [
+          "Read online in your browser or download the complete PDF edition free of charge",
+          "Shared for educational, reference, and personal study purposes",
+          "Full authorship and copyright credit belong to the original author and publisher",
+        ]
+      : categorySlug === "marketing"
       ? [
           "Plan and structure high-performing social media content step by step",
           "Grow an engaged audience organically and understand campaign fundamentals",
@@ -231,9 +243,9 @@ export function classifyWooProduct(woo: WooRawProduct): ClassifiedWooProduct {
     categorySlug,
     type,
     level,
-    priceCents,
-    salePriceCents,
-    isFree: false,
+    priceCents: isFree ? 0 : priceCents,
+    salePriceCents: isFree ? null : salePriceCents,
+    isFree,
     featured: Boolean(woo.featured) || FEATURED_WOO_IDS.has(woo.id),
     subtitle,
     description,

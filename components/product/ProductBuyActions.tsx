@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, FileDown, ShoppingBag, Zap } from "lucide-react";
+import { BookOpen, Check, FileDown, ShoppingBag, Zap } from "lucide-react";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { PriceTag } from "@/components/ui/PriceTag";
 import { cart, useCart } from "@/lib/cart/store";
@@ -10,6 +10,17 @@ import { effectivePrice, isOnSale, isPurchasable } from "@/lib/pricing";
 import { showToast } from "@/components/ui/Toast";
 import { track } from "@/lib/analytics/client";
 import { t } from "@/lib/i18n";
+
+const FREE_BOOK_LINKS: Record<string, { readUrl: string; pdfUrl: string }> = {
+  "chambers-twentieth-century-dictionary": {
+    readUrl: "https://archive.org/details/dli.bengal.10689.11967/mode/2up",
+    pdfUrl: "https://archive.org/download/dli.bengal.10689.11967/10689.11967.pdf",
+  },
+  "psychology-of-singing": {
+    readUrl: "https://archive.org/details/cu31924021742659/mode/2up",
+    pdfUrl: "https://archive.org/download/cu31924021742659/cu31924021742659.pdf",
+  },
+};
 
 export function ProductBuyActions({
   product,
@@ -24,6 +35,7 @@ export function ProductBuyActions({
     salePriceCents: number | null;
     isFree: boolean;
     sampleFileKey?: string | null;
+    freeDownloadUrl?: string | null;
   };
 }) {
   const router = useRouter();
@@ -79,10 +91,39 @@ export function ProductBuyActions({
     showToast(`Added "${product.title}" to cart`);
   }
 
+  const freeLinks = FREE_BOOK_LINKS[product.slug];
+  const directFreePdf = product.freeDownloadUrl || freeLinks?.pdfUrl || null;
+  const directFreeRead = freeLinks?.readUrl || directFreePdf;
+
   return (
     <>
       <div ref={boxRef} className="space-y-3">
-        {canBuy ? (
+        {product.isFree && directFreePdf ? (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {directFreeRead && (
+              <a
+                href={directFreeRead}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track("sample_download", { slug: product.slug })}
+                className="bg-primary text-primary-fg hover:bg-primary-hover flex min-h-12 items-center justify-center gap-2 rounded-md px-5 font-semibold no-underline transition-colors"
+              >
+                <BookOpen className="size-5" aria-hidden />
+                <span>Read Book Online</span>
+              </a>
+            )}
+            <a
+              href={directFreePdf}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track("sample_download", { slug: product.slug })}
+              className="border-line hover:border-primary bg-surface-2 text-fg flex min-h-12 items-center justify-center gap-2 rounded-md border px-5 font-semibold no-underline transition-colors"
+            >
+              <FileDown className="text-link size-5" aria-hidden />
+              <span>Download Free PDF</span>
+            </a>
+          </div>
+        ) : canBuy ? (
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Button
               size="lg"

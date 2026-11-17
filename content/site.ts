@@ -35,6 +35,8 @@ export const disclaimers = {
     "Educational notice: Cryptocurrency and digital assets involve significant risks. Information provided by Akwasuccess is educational and is not a guarantee of profit or personalised, regulated investment advice.",
   health:
     "This content is for education and awareness only. It is not a substitute for professional medical diagnosis or treatment.",
+  copyright:
+    "Copyright & Attribution Notice: Akwasuccess does not claim or hold copyright ownership over third-party or public-domain books in our Free Books Library. All authorship, rights, and credit belong to the respective original authors and publishers. These works are shared free of charge strictly for educational, reference, and personal study purposes.",
   shortCrypto: "Not financial advice. Educational content only.",
 } as const;
 

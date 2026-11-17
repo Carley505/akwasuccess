@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileDown, ArrowRight } from "lucide-react";
+import { BookOpen, FileDown, ArrowRight } from "lucide-react";
 import { PageHeader, Section, SectionHeading } from "@/components/ui/Layout";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { NewsletterForm } from "@/components/marketing/NewsletterForm";
@@ -8,6 +8,27 @@ import { Badge } from "@/components/ui/Badge";
 import { DisclaimerBanner } from "@/components/ui/DisclaimerBanner";
 import { learningPaths } from "@/content/paths";
 import { seedProducts } from "@/content/products";
+
+const freeReferenceBooks = [
+  {
+    slug: "chambers-twentieth-century-dictionary",
+    title: "Chambers Twentieth Century Dictionary",
+    author: "Edited by Rev. Thomas Davidson & A.M. Macdonald",
+    description:
+      "Comprehensive English language reference dictionary covering vocabulary, etymology, idioms, literary terms, and technical definitions for students, writers, and lifelong learners.",
+    readUrl: "https://archive.org/details/dli.bengal.10689.11967/mode/2up",
+    pdfUrl: "https://archive.org/download/dli.bengal.10689.11967/10689.11967.pdf",
+  },
+  {
+    slug: "psychology-of-singing",
+    title: "The Psychology of Singing",
+    author: "By David C. Taylor",
+    description:
+      "A Rational Method of Voice Culture Based on a Scientific Analysis of All Systems, Ancient and Modern — exploring the mental, physiological, and acoustic foundations of vocal production.",
+    readUrl: "https://archive.org/details/cu31924021742659/mode/2up",
+    pdfUrl: "https://archive.org/download/cu31924021742659/cu31924021742659.pdf",
+  },
+];
 
 export const metadata: Metadata = {
   title: "Free Starter Resources & Sample Chapters",
@@ -59,6 +80,71 @@ export default function FreeResourcesPage() {
               idPrefix="free-page"
             />
           </div>
+        </div>
+      </Section>
+
+      <Section labelledBy="free-books-heading">
+        <SectionHeading
+          id="free-books-heading"
+          eyebrow="Free books & reference library"
+          title="Free books to read online and download"
+          intro="Classic educational reference works shared free of charge for learners, students, and researchers."
+          action={
+            <Link
+              href="/shop/free-books"
+              className="text-link inline-flex items-center gap-1 text-sm font-semibold no-underline hover:underline"
+            >
+              View Free Books category <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          }
+        />
+        <div className="grid gap-6 md:grid-cols-2">
+          {freeReferenceBooks.map((book) => (
+            <div key={book.slug} className="card flex flex-col justify-between gap-5 p-6">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="green">Free Reference Book</Badge>
+                  <Badge tone="outline-gold">PDF &amp; Online Reader</Badge>
+                </div>
+                <h3 className="text-xl font-bold">
+                  <Link href={`/shop/${book.slug}`} className="hover:text-link no-underline">
+                    {book.title}
+                  </Link>
+                </h3>
+                <p className="text-gold-text text-xs font-semibold">{book.author}</p>
+                <p className="text-muted text-sm">{book.description}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <a
+                  href={book.readUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-primary text-primary-fg hover:bg-primary-hover inline-flex min-h-11 items-center gap-2 rounded-md px-4 font-semibold no-underline"
+                >
+                  <BookOpen className="size-4" aria-hidden />
+                  <span>Read Book Online</span>
+                </a>
+                <a
+                  href={book.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border-line hover:border-primary bg-surface-2 text-fg inline-flex min-h-11 items-center gap-2 rounded-md border px-4 font-semibold no-underline"
+                >
+                  <FileDown className="text-link size-4" aria-hidden />
+                  <span>Download Free PDF</span>
+                </a>
+                <Link
+                  href={`/shop/${book.slug}`}
+                  className="text-link inline-flex items-center gap-1 font-semibold no-underline hover:underline"
+                >
+                  Details <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6">
+          <DisclaimerBanner variant="copyright" />
         </div>
       </Section>
 
